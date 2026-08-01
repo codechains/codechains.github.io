@@ -51,7 +51,7 @@ First, **it had to load reliably outside Korea.** Our business involves customer
 
 Second, and this one mattered more, **no human hands in the deployment.** I needed this precisely so the neglect above wouldn't repeat. If changing something is a chore, you stop changing it, and once you stop, another few years go by. I had already lived through that once.
 
-With Cloudflare, you connect a GitHub repository and **pushing the source is the deployment**. I edit with Cursor and Claude, push, and that's it. There is no separate release step. Making the site easy to change was worth more to me than the thirty four dollars.
+With Cloudflare, you connect a GitHub repository and **pushing the source is the deployment**. I edit with Cursor and Claude, push, and that's it. There is no separate release step. Making the site easy to change was worth more to me than the thirty four dollars. The setup is documented in [Cloudflare Pages' Git integration guide](https://developers.cloudflare.com/pages/get-started/git-integration/).
 
 I looked at Vercel too, but my impression was that its strengths lean toward applications rather than brochure sites. What I was moving was a few static pages, and Cloudflare fit that shape better.
 
@@ -78,7 +78,7 @@ The thing that took the most time wasn't code. It was the **address**.
 
 After I pointed the domain's nameservers at Cloudflare, typing the address with `www` and without it went to two different places. One showed the new site correctly. The other went right back to the old Wix site.
 
-A nameserver change is not a switch you flip. It spreads across the internet over time, and during that window both sites are alive at once. If you haven't decided where the `www` address and the bare address should each land, different visitors see different sites. Some get the new one, some get the old one.
+A nameserver change is not a switch you flip. It spreads across the internet over time, and during that window both sites are alive at once. Where you change it depends on who you bought the domain from, and [Cloudflare's guide to updating nameservers](https://developers.cloudflare.com/dns/nameservers/update-nameservers/) collects the instructions for the major registrars in one place. If you haven't decided where the `www` address and the bare address should each land, different visitors see different sites. Some get the new one, some get the old one.
 
 This is exactly the category of problem that used to stop me. If you don't know the cause, "why does this one person still see the old page" eats a whole day. This time I described the symptom plainly, asked what to check, and worked through it. Which taught me something. It was never a task I **couldn't** do. It was a task I kept postponing because of how long finding out would take.
 
@@ -89,6 +89,8 @@ This is the part I was most careful about.
 The sites had been running for years, so Google had pages indexed. If the addresses changed during the move, all the accumulated search traffic would vanish with them. Saving four hundred dollars while losing something worth more.
 
 So I set a rule: **keep the URLs and the menu path structure exactly as they were.** Rebuild the screens if needed, but do not touch the addresses. Whenever a judgment call came up, I checked it before committing to it.
+
+Google publishes guidance for exactly this case, [moving hosting without changing URLs](https://developers.google.com/search/docs/crawling-indexing/site-move-no-url-changes). Worth reading before you start. It spells out the obvious but easy to skip order of operations, like confirming the new host serves correctly before you take the old one down.
 
 The last step was pointing the domain's nameservers at Cloudflare. Total elapsed time: **two days**.
 
@@ -125,6 +127,7 @@ From the seat of someone running a small company:
 - **Do not change the URL structure.** Search traffic costs more than hosting
 - After a nameserver change, check the address **both with and without** `www`
 - Watch the new site for a few days before you cancel the old plan
+- Register the site in [Google Search Console](https://search.google.com/search-console). It is the only window you have into what happens to your search presence after the move, and it is free
 - **Pick a host that deploys itself.** Anything that takes manual effort ends in neglect
 - If your site is dated and you can't bring yourself to touch it, **redesign it while you move it.** Once the files are in your hands, relaying the whole design gets far lighter
 
