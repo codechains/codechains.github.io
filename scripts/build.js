@@ -199,6 +199,19 @@ const T = {
   en: { nav_about: "About", home: "Home", posts: "Posts", langAlt: "한국어", author_label: "Written by", author_more: "About me", nl_h: "Get new posts by email", nl_p: "Be first to read new posts from the AI transformation journey. No spam.", nl_btn: "Subscribe", nl_ph: "your email", nl_note: "Subscriptions are being wired up. For now, reach me at hello@codechains.dev!", ad: "Ad slot (shown after AdSense approval)", latest: "Latest posts", back: "← All posts", readmore: "Read" },
 };
 
+/* 공유 카드 이미지의 실제 크기. og:image:width/height 를 같이 보내면
+   카카오톡·페이스북 같은 곳이 이미지를 받기 전에도 자리를 잡아, 처음 공유할 때
+   미리보기가 비어 보이는 일이 줄어듭니다. 파일에서 직접 읽으므로 카드를 다시 만들어도 맞습니다. */
+function pngDims(rel) {
+  try {
+    const b = fs.readFileSync(path.join(ASSETS, rel.replace(/^\/assets\//, "")));
+    const sig = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+    if (b.slice(0, 8).equals(sig)) return { w: b.readUInt32BE(16), h: b.readUInt32BE(20) };
+  } catch (e) {}
+  return null;
+}
+const OG_DIMS = site.ogImage ? pngDims(site.ogImage) : null;
+
 /* ---------- layout ---------- */
 /* JSON-LD 를 <script> 안에 안전하게 넣기 — 본문에 </script> 가 섞여도 태그가 깨지지 않도록 < 를 이스케이프 */
 function jsonLdTag(obj) {
@@ -225,7 +238,9 @@ function layout({ lang, title, description, canonical, langAltHref, active, body
   const ogImage = site.ogImage
     ? `<meta property="og:image" content="${site.url}${site.ogImage}">
 <meta property="og:image:alt" content="${esc(site.brand)}">
-<meta name="twitter:image" content="${site.url}${site.ogImage}">
+${OG_DIMS ? `<meta property="og:image:width" content="${OG_DIMS.w}">
+<meta property="og:image:height" content="${OG_DIMS.h}">
+` : ""}<meta name="twitter:image" content="${site.url}${site.ogImage}">
 `
     : "";
   const homeHref = isEn ? "/en/" : "/";
