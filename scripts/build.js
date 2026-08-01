@@ -138,12 +138,18 @@ ${body}
   </span>
 </div></footer>
 ${THEME_TOGGLE_JS}
-${SUBSCRIBE_JS}
+${NEWSLETTER_ENABLED ? SUBSCRIBE_JS : ""}
 </body>
 </html>`;
 }
 
+/* 뉴스레터 구독 노출 스위치.
+   구독 서비스를 실제로 시작할 때 true 로 바꾸면 홈·소개·글 하단에 다시 나타납니다.
+   (마크업·문구·스크립트는 그대로 보존돼 있어 되돌리는 데 이 한 줄이면 됩니다) */
+const NEWSLETTER_ENABLED = false;
+
 function newsletter(lang) {
+  if (!NEWSLETTER_ENABLED) return "";
   const t = T[lang];
   return `<section class="newsletter">
   <h3>${t.nl_h}</h3>
