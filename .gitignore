@@ -1,0 +1,16 @@
+# 빌드 결과물 — build.js로 언제든 재생성되는 파생물이라 커밋하지 않음
+site/
+
+# 의존성
+node_modules/
+
+# 배포 묶음/미리보기 등 로컬 산출물
+dist/
+preview-*.html
+
+# OS/에디터 잡파일
+.DS_Store
+Thumbs.db
+*.log
+.vscode/
+.idea/
