@@ -1,7 +1,7 @@
 ---
 title: From Wix to Cloudflare, $408 a Year Down to Zero
 date: 2026-08-01 14:00:00 +09:00
-description: Two company websites and two days with Claude and Cursor. How I moved sites that had no source files, where it broke, and how I kept the search traffic.
+description: Two company websites, two days with Claude and Cursor. How I moved sites with no source files, kept the search traffic, and got the redesign I had postponed.
 tags: [infrastructure, cost, cloudflare, migration]
 ---
 
@@ -33,13 +33,23 @@ That wasn't laziness, it was the right call at the time. We couldn't spare a str
 
 The catch is that convenience gets billed **every month, forever**. What was reasonable at the start slowly turned into too much.
 
+## The bigger cost wasn't the money
+
+The real problem surfaced later, when we wanted to redesign the whole site.
+
+Every screen had been assembled by dragging pieces into place, one page at a time. So applying a consistent design language across the site meant rebuilding those pages from scratch. Touch only part of it and the rest no longer matches. Touch all of it and the hours stop being affordable.
+
+A small company is already busy with its actual business. We couldn't put time and people into this. So we missed the window for a redesign once, then missed it again. **The company site sat there, untouched.** While we paid thirty four dollars a month for it.
+
+Money going out, site standing still. That combination is the real reason I finally moved.
+
 ## Why Cloudflare
 
 There were plenty of cheap and free hosting options. I had two requirements.
 
 First, **it had to load reliably outside Korea.** Our business involves customers abroad, so anything fast only at home was out.
 
-Second, and this one mattered more, **no human hands in the deployment.** If you save on hosting but still have to upload files by hand every time you fix a typo, that effort is just another cost. And anything that takes effort eventually doesn't get done. A few months later nobody touches the site at all. You saved the money and let the site rot.
+Second, and this one mattered more, **no human hands in the deployment.** I needed this precisely so the neglect above wouldn't repeat. If changing something is a chore, you stop changing it, and once you stop, another few years go by. I had already lived through that once.
 
 With Cloudflare, you connect a GitHub repository and **pushing the source is the deployment**. I edit with Cursor and Claude, push, and that's it. There is no separate release step. Making the site easy to change was worth more to me than the thirty four dollars.
 
@@ -82,6 +92,16 @@ So I set a rule: **keep the URLs and the menu path structure exactly as they wer
 
 The last step was pointing the domain's nameservers at Cloudflare. Total elapsed time: **two days**.
 
+## And then the redesign I'd been postponing
+
+Once the move was done, one thing was still sitting there. The full redesign we hadn't managed for years.
+
+This time the conditions were different. The site was now in my hands as HTML, CSS and JS files. So I asked Claude to propose a redesign for the whole site. We went back and forth over what it came up with, shaped the direction together, and switched to the result in one pass.
+
+With WYSIWYG this had been unthinkable. Each page was built separately, so matching a design language meant reassembling all of them. **Once it was files, it became a matter of applying one set of rules across every page at once.** A different kind of job entirely.
+
+So what came out of this isn't only the hosting savings. A company site that had been frozen and dated now looks like something built this year. Something postponed for years came along for the ride.
+
 ## What's left
 
 | | Before | After |
@@ -90,7 +110,7 @@ The last step was pointing the domain's nameservers at Cloudflare. Total elapsed
 | Monthly hosting | $34 | $0 |
 | Yearly hosting | $408 | $0 |
 | Deployment | by hand in the Wix editor | automatic on git push |
-| Appearance | original | rebuilt, near identical |
+| Design | untouched for years | fully redesigned |
 | URL structure | original | unchanged |
 
 To be precise, the domain registration fee is unchanged. What went to zero is the hosting.
@@ -106,10 +126,11 @@ From the seat of someone running a small company:
 - After a nameserver change, check the address **both with and without** `www`
 - Watch the new site for a few days before you cancel the old plan
 - **Pick a host that deploys itself.** Anything that takes manual effort ends in neglect
+- If your site is dated and you can't bring yourself to touch it, **redesign it while you move it.** Once the files are in your hands, relaying the whole design gets far lighter
 
 ## So
 
-I had put this off for years. Not because it was hard, but because I didn't know what would crawl out once I touched it. Watching it finish in two days with Claude and Cursor genuinely surprised me.
+The move and the redesign had both been sitting on my list for years. Not because they were hard, but because I didn't know what would crawl out once I touched them. Watching both finish at once with Claude and Cursor genuinely surprised me.
 
 And this isn't a story about one homepage. Every small company has other items shelved for years under "not urgent right now." What I confirmed this week is that there's a reason to pull that list back out.
 
