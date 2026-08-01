@@ -131,16 +131,21 @@ const THEME_SCRIPT = `<script>(function(){try{var t=localStorage.getItem('cc-the
 const THEME_TOGGLE_JS = `<script>(function(){var b=document.getElementById('themeBtn');if(!b)return;function cur(){return document.documentElement.getAttribute('data-theme')||'dark';}function set(v){document.documentElement.setAttribute('data-theme',v);try{localStorage.setItem('cc-theme',v);}catch(e){}b.textContent=v==='dark'?'☀':'☾';}b.textContent=cur()==='dark'?'☀':'☾';b.addEventListener('click',function(){set(cur()==='dark'?'light':'dark');});})();</script>`;
 const SUBSCRIBE_JS = `<script>(function(){var f=document.getElementById('subForm');if(!f)return;f.addEventListener('submit',function(e){e.preventDefault();var n=document.getElementById('subNote');if(n)n.style.display='block';});})();</script>`;
 
-/* 언어 자동 분기 — 한국어 홈(/)에서만 동작.
-   1) 사용자가 언어 링크로 직접 고른 적이 있으면(cc-lang) 그 선택을 최우선으로 존중
-   2) 선택 이력이 없으면 브라우저 언어(navigator.languages)를 보고 한국어가 아니면 /en/ 으로 이동
-   국가(IP)가 아니라 언어 설정으로 판단합니다 — 해외의 한국인은 한국어를,
-   국내의 외국인은 영어를 원하기 때문입니다.
-   깜빡임을 없애려고 <head>에서 본문 렌더 전에 실행하고, 히스토리를 더럽히지 않도록 replace 를 씁니다. */
-const LANG_REDIRECT = `<script>(function(){try{var p=localStorage.getItem('cc-lang');if(p==='ko')return;if(p==='en'){location.replace('/en/');return;}var l=navigator.languages||[navigator.language||''];for(var i=0;i<l.length;i++){if(/^ko/i.test(l[i]))return;}location.replace('/en/');}catch(e){}})();</script>`;
+/* 언어 이어가기 — 한국어 홈(/)에서만 동작.
 
-/* 언어 링크를 직접 눌렀을 때 그 선택을 기억 → 이후로는 자동 분기가 끼어들지 않음 */
-const LANG_REMEMBER_JS = `<script>(function(){var a=document.getElementById('langLink');if(!a)return;a.addEventListener('click',function(){try{localStorage.setItem('cc-lang',a.getAttribute('data-lang'));}catch(e){}});})();</script>`;
+   예전에는 브라우저 언어(navigator.languages)를 보고 한국어가 아니면 자동으로 /en/ 으로
+   보냈습니다. 그 방식은 접었습니다. Googlebot 도 자바스크립트를 실행하고 그 언어 설정이
+   보통 영어라, 크롤러가 한국어 홈을 보러 왔다가 영어 홈으로 튕겨 나갔기 때문입니다.
+   구글은 인지된 언어에 따른 자동 리디렉션을 권장하지 않습니다(크롤러가 모든 언어판을
+   보지 못하게 됨). 대신 다른 언어판이 있다는 것을 화면에 보이게 알립니다(langNotice).
+
+   지금 남은 동작은 하나입니다. 사용자가 언어를 직접 고른 적이 있으면 그 선택을 이어 줍니다.
+   크롤러에는 저장된 선택이 없으므로 이동이 일어나지 않습니다.
+   깜빡임을 없애려고 <head>에서 본문 렌더 전에 실행하고, 히스토리를 더럽히지 않도록 replace 를 씁니다. */
+const LANG_REDIRECT = `<script>(function(){try{if(localStorage.getItem('cc-lang')==='en'){location.replace('/en/');}}catch(e){}})();</script>`;
+
+/* 언어 링크(머리말·안내 줄)를 직접 눌렀을 때 그 선택을 기억 */
+const LANG_REMEMBER_JS = `<script>(function(){[].slice.call(document.querySelectorAll('[data-lang]')).forEach(function(a){a.addEventListener('click',function(){try{localStorage.setItem('cc-lang',a.getAttribute('data-lang'));}catch(e){}});});})();</script>`;
 
 const T = {
   ko: { nav_about: "소개", home: "홈", posts: "글", langAlt: "EN", author_label: "글쓴이", author_more: "소개 보기", contact: "비슷한 상황이라면 편하게 물어보세요.", nl_h: "새 글을 이메일로 받아보기", nl_p: "AI 트랜스폼 여정의 새 글을 가장 먼저 받아보세요. 스팸은 없습니다.", nl_btn: "구독", nl_ph: "이메일 주소", nl_note: "구독 기능은 곧 연결됩니다. 우선 hello@codechains.dev 로 연락 주셔도 좋아요!", ad: "광고 영역 (애드센스 승인 후 표시됩니다)", latest: "최근 글", back: "← 목록으로", readmore: "읽기" },
@@ -187,11 +192,15 @@ function layout({ lang, title, description, canonical, langAltHref, active, body
   // hreflang: 검색엔진에 "같은 글의 다른 언어판"을 알려 각 언어권에 맞는 페이지가 노출되게 함
   const koHref = isEn ? langAltHref : canonical;
   const enHref = isEn ? canonical : langAltHref;
+  /* x-default 는 한국어도 영어도 아닌 방문자가 갈 곳입니다(독일어·일본어 등).
+     영어를 기본으로 둡니다. 해외 유입을 주로 보고 있고, 제3언어권 방문자에게는
+     읽지 못하는 한국어보다 영어가 낫기 때문입니다.
+     한국어 사용자는 hreflang="ko" 를 따라가므로 이 값에 영향받지 않습니다. */
   const altLinks = noAlt
     ? ""
     : `<link rel="alternate" hreflang="ko" href="${site.url}${koHref}">
 <link rel="alternate" hreflang="en" href="${site.url}${enHref}">
-<link rel="alternate" hreflang="x-default" href="${site.url}${koHref}">
+<link rel="alternate" hreflang="x-default" href="${site.url}${enHref}">
 `;
   /* 공유 카드 이미지. site.json 의 ogImage 에 경로(예: "/assets/og.png")를 채우면 활성화됩니다.
      이미지가 없는데 summary_large_image 를 선언하면 SNS에서 빈 카드가 뜨므로,
@@ -298,6 +307,17 @@ function newsletter(lang) {
    같은 정보를 JSON-LD 의 author 로도 내보내 크롤러가 사람과 글을 연결할 수 있게 합니다. */
 const authorBio = (lang) => (lang === "en" ? site.authorBioEn : site.authorBioKo) || "";
 
+/* 다른 언어판이 있다는 것을 눈에 보이게 알립니다. 자동 이동을 없앤 자리를 채우는 장치입니다.
+   문구는 읽는 사람이 아는 언어로 씁니다. 한국어 화면에는 영어로, 영어 화면에는 한국어로.
+   그래야 자기가 못 읽는 화면에 떨어진 사람이 이 줄만은 알아봅니다. */
+function langNotice(lang) {
+  const isEn = lang === "en";
+  return `<p class="lang-notice">
+  <span>${isEn ? "이 사이트는 한국어로도 읽을 수 있습니다." : "This site is also available in English."}</span>
+  <a data-lang="${isEn ? "ko" : "en"}" href="${isEn ? "/" : "/en/"}">${isEn ? "한국어로 보기" : "Read in English"} →</a>
+</p>`;
+}
+
 function contactLine(lang) {
   if (!CONTACT_ENABLED) return "";
   return `<p class="post-contact">${T[lang].contact} <a href="mailto:${esc(site.email)}">${esc(site.email)}</a></p>`;
@@ -376,7 +396,8 @@ function buildHome(lang, posts) {
   const intro = isEn
     ? "The journey of moving into AI, built and documented in the open, one link at a time."
     : "AI로 일하는 방식으로 전환하는 여정을, 공개된 곳에서 하나씩 이어 붙여 기록합니다.";
-  const body = `<section class="hero">
+  const body = `${langNotice(lang)}
+<section class="hero">
   <h1>${isEn ? "Chaining code into a<br><span class=\"grad\">new career.</span>" : "이어 붙인 기록이,<br><span class=\"grad\">커리어가 된다.</span>"}</h1>
   <p>${esc(tagline)}</p>
   <div class="cta">
