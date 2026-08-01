@@ -44,13 +44,11 @@ const MIME = {
 
 /* ---------- 빌드 ---------- */
 function build() {
-  // CC_ADMIN=1 은 로컬 전용 관리 페이지(/admin)를 만들라는 신호입니다.
-  // 배포(GitHub Actions)는 이 변수 없이 build.js 를 돌리므로 관리 페이지가 생기지 않습니다.
-  const r = spawnSync(process.execPath, [BUILD], {
-    cwd: ROOT,
-    encoding: "utf8",
-    env: { ...process.env, CC_ADMIN: "1", PORT: String(PORT) },
-  });
+  // 로컬 빌드이므로 관리 페이지가 함께 만들어집니다(배포 빌드에서만 빠집니다).
+  // CC_DEPLOY 가 환경에 남아 있으면 관리 페이지가 사라지므로 여기서 확실히 꺼둡니다.
+  const env = { ...process.env, PORT: String(PORT) };
+  delete env.CC_DEPLOY;
+  const r = spawnSync(process.execPath, [BUILD], { cwd: ROOT, encoding: "utf8", env });
   if (r.status === 0) {
     process.stdout.write(r.stdout);
     return true;

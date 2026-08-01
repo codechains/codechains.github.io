@@ -559,10 +559,15 @@ if (site.customDomain) write("CNAME", site.customDomain + "\n");
 write("robots.txt", `User-agent: *\nAllow: /\nSitemap: ${site.url}/sitemap.xml\n`);
 
 /* ---------- 로컬 전용 콘텐츠 관리 페이지 ----------
-   npm run dev (serve.js) 가 CC_ADMIN=1 을 넣어줄 때만 만듭니다.
-   GitHub Actions 는 이 변수 없이 build.js 를 돌리므로 배포본에는 들어가지 않습니다.
-   sitemap·feed 에도 넣지 않습니다. */
-const ADMIN = process.env.CC_ADMIN === "1";
+   기본은 "만든다" 입니다. 배포 빌드일 때만 만들지 않고, 남아 있던 것도 지웁니다.
+
+   반대로(배포가 기본, 로컬은 옵션) 두면 npm run build 처럼 평범한 로컬 빌드가
+   관리 페이지를 지워버려서, 새로고침해도 안 보이는 일이 계속 생깁니다.
+   배포 경로는 GitHub Actions 하나뿐이고 그쪽은 아래 두 조건에 모두 걸리므로,
+   기본값을 로컬 쪽에 맞추는 편이 안전하면서 덜 헷갈립니다.
+   sitemap·feed 에는 어느 경우에도 넣지 않습니다. */
+const DEPLOY = process.env.CC_DEPLOY === "1" || process.env.CI === "true";
+const ADMIN = !DEPLOY;
 const ADMIN_DIR = path.join(OUT, "admin");
 if (ADMIN) {
   const { buildAdmin } = require("./admin");
@@ -584,5 +589,5 @@ const draftCount = (koAll.length - koPosts.length) + (enAll.length - enPosts.len
 console.log(
   `Built ${koPosts.length} KO + ${enPosts.length} EN posts, ${urls.length} URLs, ${assetCount} asset file(s) copied.` +
   (draftCount ? ` (초안 ${draftCount}개 제외)` : "") +
-  (ADMIN ? ` 관리 페이지: http://localhost:${process.env.PORT || 4000}/admin/` : "")
+  (ADMIN ? ` 관리 페이지: http://localhost:${process.env.PORT || 4000}/admin/` : " (배포 빌드: 관리 페이지 제외)")
 );

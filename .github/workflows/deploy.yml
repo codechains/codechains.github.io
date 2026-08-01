@@ -24,7 +24,11 @@ jobs:
         with:
           node-version: 20
       - run: npm ci
+      # CC_DEPLOY=1 은 로컬 전용 관리 페이지(/admin)를 산출물에서 빼라는 신호입니다.
+      # Actions 가 항상 넣어주는 CI=true 로도 같은 판정이 되지만, 배포 의도를 파일에 남겨둡니다.
       - run: node scripts/build.js
+        env:
+          CC_DEPLOY: "1"
       - uses: actions/upload-pages-artifact@v3
         with:
           path: site
