@@ -18,10 +18,11 @@ const { spawnSync } = require("child_process");
 const ROOT = path.join(__dirname, "..");
 const OUT = path.join(ROOT, "site");
 const BUILD = path.join(__dirname, "build.js");
+const ADMIN = path.join(__dirname, "admin.js");
 const PORT = Number(process.env.PORT) || 4000;
 
 // 변경을 감시할 대상 — 빌드 입력이 되는 것들만
-const WATCH = [path.join(ROOT, "content"), path.join(ROOT, "assets"), BUILD];
+const WATCH = [path.join(ROOT, "content"), path.join(ROOT, "assets"), BUILD, ADMIN];
 
 const MIME = {
   ".html": "text/html; charset=utf-8",
@@ -43,7 +44,13 @@ const MIME = {
 
 /* ---------- 빌드 ---------- */
 function build() {
-  const r = spawnSync(process.execPath, [BUILD], { cwd: ROOT, encoding: "utf8" });
+  // CC_ADMIN=1 은 로컬 전용 관리 페이지(/admin)를 만들라는 신호입니다.
+  // 배포(GitHub Actions)는 이 변수 없이 build.js 를 돌리므로 관리 페이지가 생기지 않습니다.
+  const r = spawnSync(process.execPath, [BUILD], {
+    cwd: ROOT,
+    encoding: "utf8",
+    env: { ...process.env, CC_ADMIN: "1", PORT: String(PORT) },
+  });
   if (r.status === 0) {
     process.stdout.write(r.stdout);
     return true;
@@ -163,6 +170,7 @@ build();
 watch();
 server.listen(PORT, () => {
   console.log(`\n  로컬 서버: http://localhost:${PORT}`);
+  console.log(`  콘텐츠 관리: http://localhost:${PORT}/admin  (로컬 전용, 배포되지 않음)`);
   console.log("  content/ · assets/ · scripts/build.js 를 저장하면 자동으로 반영됩니다.");
   console.log("  종료: Ctrl+C\n");
 });

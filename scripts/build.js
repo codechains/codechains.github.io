@@ -58,6 +58,9 @@ function fmtDate(iso, lang) {
   }
   return `${y}.${String(m).padStart(2, "0")}.${String(d).padStart(2, "0")}`;
 }
+/* 초안까지 포함한 전체 글을 최신순으로 읽습니다.
+   공개용으로 쓸 때는 published() 로 한 번 걸러서 씁니다.
+   (초안도 읽는 이유: 로컬 관리 페이지가 "아직 안 낸 글"을 보여줘야 하기 때문) */
 function loadPosts(dir) {
   if (!fs.existsSync(dir)) return [];
   return fs
@@ -67,15 +70,16 @@ function loadPosts(dir) {
       const parsed = fm(read(path.join(dir, f)));
       return {
         slug: slugOf(f),
+        file: f, // 원본 파일명. 관리 페이지에서 이 파일을 바로 열기 위해 남깁니다.
         ...parsed.attributes,
         date: normDate(parsed.attributes.date),
         rawBody: parsed.body, // 검사용 원문(마크다운). 렌더링에는 bodyHtml 을 씁니다.
         bodyHtml: marked.parse(parsed.body),
       };
     })
-    .filter((p) => !p.draft) // draft: true → 공개 안 함(버전 관리는 됨)
     .sort((a, b) => String(b.date).localeCompare(String(a.date)));
 }
+const published = (posts) => posts.filter((p) => !p.draft); // draft: true → 공개 안 함(버전 관리는 됨)
 const esc = (s) => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 
 /* ---------- SEO 검사 ----------
@@ -86,43 +90,53 @@ const esc = (s) => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replac
 const SEO = { descMin: 40, descMax: 160, titleMax: 60 };
 
 function checkSeo(posts, label) {
-  const errors = [];
-  const warnings = [];
+  /* 검사 결과는 글 단위로 모읍니다.
+     콘솔 출력용 문자열과, 로컬 관리 페이지가 글마다 배지로 보여줄 목록이 같은 데이터에서 나옵니다. */
+  const issues = []; // { slug, level: "error" | "warn", msg }
+  const bySlug = new Map();
+  const add = (slug, level, msg) => {
+    const item = { slug, level, msg };
+    issues.push(item);
+    if (!bySlug.has(slug)) bySlug.set(slug, []);
+    bySlug.get(slug).push(item);
+  };
   const seenSlugs = new Map();
 
   posts.forEach((p) => {
-    const where = `${label}/${p.slug}`;
+    const err = (m) => add(p.slug, "error", m);
+    const warn = (m) => add(p.slug, "warn", m);
 
-    if (!p.title || !String(p.title).trim()) errors.push(`${where}: title 이 없습니다.`);
-    if (!p.date || !/^\d{4}-\d{2}-\d{2}$/.test(p.date)) errors.push(`${where}: date 가 없거나 형식이 잘못됐습니다(YYYY-MM-DD).`);
+    if (!p.title || !String(p.title).trim()) err(`title 이 없습니다.`);
+    if (!p.date || !/^\d{4}-\d{2}-\d{2}$/.test(p.date)) err(`date 가 없거나 형식이 잘못됐습니다(YYYY-MM-DD).`);
     if (!p.description || !String(p.description).trim()) {
-      errors.push(`${where}: description 이 없습니다. 검색결과에 보이는 문장이라 글마다 반드시 달라야 합니다.`);
+      err(`description 이 없습니다. 검색결과에 보이는 문장이라 글마다 반드시 달라야 합니다.`);
     } else {
       const len = String(p.description).trim().length;
-      if (len < SEO.descMin) warnings.push(`${where}: description 이 ${len}자로 짧습니다(권장 ${SEO.descMin}~${SEO.descMax}자).`);
-      if (len > SEO.descMax) warnings.push(`${where}: description 이 ${len}자로 깁니다. 검색결과에서 뒷부분이 잘립니다(권장 ${SEO.descMax}자 이내).`);
+      if (len < SEO.descMin) warn(`description 이 ${len}자로 짧습니다(권장 ${SEO.descMin}~${SEO.descMax}자).`);
+      if (len > SEO.descMax) warn(`description 이 ${len}자로 깁니다. 검색결과에서 뒷부분이 잘립니다(권장 ${SEO.descMax}자 이내).`);
     }
 
     if (p.title && String(p.title).length > SEO.titleMax) {
-      warnings.push(`${where}: title 이 ${String(p.title).length}자로 깁니다. 검색결과에서 잘릴 수 있습니다(권장 ${SEO.titleMax}자 이내).`);
+      warn(`title 이 ${String(p.title).length}자로 깁니다. 검색결과에서 잘릴 수 있습니다(권장 ${SEO.titleMax}자 이내).`);
     }
-    if (!(p.tags || []).length) warnings.push(`${where}: tags 가 없습니다.`);
+    if (!(p.tags || []).length) warn(`tags 가 없습니다.`);
 
     /* 긴 하이픈(em dash —, en dash –)은 AI가 쓴 글이라는 인상을 주는 대표적인 흔적이라 기본적으로 쓰지 않습니다.
        쉼표나 마침표로 대체하세요. 의도적으로 넣은 경우라면 이 경고는 무시하면 됩니다(빌드는 통과). */
     const dashFields = [["title", p.title], ["description", p.description], ["본문", p.rawBody]];
     dashFields.forEach(([name, text]) => {
       if (text && /[—–]/.test(String(text))) {
-        warnings.push(`${where}: ${name}에 긴 하이픈(— 또는 –)이 있습니다. 쉼표나 마침표로 바꾸세요.`);
+        warn(`${name}에 긴 하이픈(— 또는 –)이 있습니다. 쉼표나 마침표로 바꾸세요.`);
       }
     });
 
     // 슬러그가 겹치면 나중 글이 앞 글을 덮어써 조용히 사라집니다
-    if (seenSlugs.has(p.slug)) errors.push(`${where}: 슬러그가 "${seenSlugs.get(p.slug)}" 와 겹칩니다. 파일명을 바꾸세요.`);
+    if (seenSlugs.has(p.slug)) err(`슬러그가 "${seenSlugs.get(p.slug)}" 와 겹칩니다. 파일명을 바꾸세요.`);
     else seenSlugs.set(p.slug, p.slug);
   });
 
-  return { errors, warnings };
+  const lines = (level) => issues.filter((i) => i.level === level).map((i) => `${label}/${i.slug}: ${i.msg}`);
+  return { errors: lines("error"), warnings: lines("warn"), bySlug };
 }
 
 function reportSeo(groups) {
@@ -473,9 +487,14 @@ const FAVICON = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><re
 
 /* ---------- run ---------- */
 const assetCount = copyAssets();
-const koPosts = loadPosts(path.join(CONTENT, "posts"));
-const enPosts = loadPosts(path.join(CONTENT, "en", "posts"));
-reportSeo([checkSeo(koPosts, "ko"), checkSeo(enPosts, "en")]);
+const koAll = loadPosts(path.join(CONTENT, "posts"));
+const enAll = loadPosts(path.join(CONTENT, "en", "posts"));
+const koPosts = published(koAll);
+const enPosts = published(enAll);
+// 초안은 검사 대상이 아닙니다(아직 다듬는 중이므로). 공개되는 글만 봅니다.
+const koSeo = checkSeo(koPosts, "ko");
+const enSeo = checkSeo(enPosts, "en");
+reportSeo([koSeo, enSeo]);
 const urls = [];
 // 홈·목록의 lastmod 는 가장 최근 글의 날짜로 — 새 글이 나가면 크롤러가 다시 훑도록
 const latestKo = koPosts[0] && koPosts[0].date;
@@ -500,4 +519,31 @@ write(".nojekyll", "");
 if (site.customDomain) write("CNAME", site.customDomain + "\n");
 write("robots.txt", `User-agent: *\nAllow: /\nSitemap: ${site.url}/sitemap.xml\n`);
 
-console.log(`Built ${koPosts.length} KO + ${enPosts.length} EN posts, ${urls.length} URLs, ${assetCount} asset file(s) copied.`);
+/* ---------- 로컬 전용 콘텐츠 관리 페이지 ----------
+   npm run dev (serve.js) 가 CC_ADMIN=1 을 넣어줄 때만 만듭니다.
+   GitHub Actions 는 이 변수 없이 build.js 를 돌리므로 배포본에는 들어가지 않습니다.
+   sitemap·feed 에도 넣지 않습니다. */
+const ADMIN = process.env.CC_ADMIN === "1";
+const ADMIN_DIR = path.join(OUT, "admin");
+if (ADMIN) {
+  const { buildAdmin } = require("./admin");
+  write("admin/index.html", buildAdmin({
+    koAll,
+    enAll,
+    issuesBySlug: { ko: koSeo.bySlug, en: enSeo.bySlug },
+    contentDir: CONTENT,
+    builtAt: new Date().toLocaleString("ko-KR"),
+    // 파일 열기 링크의 기본 프로토콜. 화면의 선택 상자로도 바꿀 수 있습니다.
+    editor: process.env.CC_EDITOR || "cursor",
+  }));
+} else if (fs.existsSync(ADMIN_DIR)) {
+  // 배포용 빌드에서는 이전에 만들어 둔 관리 페이지를 지웁니다(실수로 공개되는 경로를 아예 없앰)
+  fs.rmSync(ADMIN_DIR, { recursive: true, force: true });
+}
+
+const draftCount = (koAll.length - koPosts.length) + (enAll.length - enPosts.length);
+console.log(
+  `Built ${koPosts.length} KO + ${enPosts.length} EN posts, ${urls.length} URLs, ${assetCount} asset file(s) copied.` +
+  (draftCount ? ` (초안 ${draftCount}개 제외)` : "") +
+  (ADMIN ? ` 관리 페이지: http://localhost:${process.env.PORT || 4000}/admin/` : "")
+);
