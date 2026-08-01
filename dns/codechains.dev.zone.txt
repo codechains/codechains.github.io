@@ -1,0 +1,47 @@
+; ============================================================
+; codechains.dev — DNS zone (BIND 형식)
+; 용도: Cloudflare DNS → Records → Import and Export → Import DNS records
+; 목적: apex(codechains.dev)를 GitHub Pages로, www는 apex로 리다이렉트
+;
+; ⚠ 임포트 시 "Proxy imported DNS records" 토글을 반드시 끌 것(회색 구름).
+;   프록시가 켜지면 GitHub의 Let's Encrypt 인증서 발급이 실패합니다.
+; ⚠ 임포트는 기존 레코드를 지우지 않습니다. 파킹용 @ / www 레코드는 미리 삭제할 것.
+; ⚠ SOA와 apex NS는 Cloudflare가 자체 관리하므로 의도적으로 제외했습니다.
+;
+; 출처: GitHub Docs — Managing a custom domain for your GitHub Pages site
+; ============================================================
+
+$ORIGIN codechains.dev.
+$TTL 3600
+
+; ---------- apex → GitHub Pages (IPv4) ----------
+@	3600	IN	A	185.199.108.153
+@	3600	IN	A	185.199.109.153
+@	3600	IN	A	185.199.110.153
+@	3600	IN	A	185.199.111.153
+
+; ---------- apex → GitHub Pages (IPv6) ----------
+@	3600	IN	AAAA	2606:50c0:8000::153
+@	3600	IN	AAAA	2606:50c0:8001::153
+@	3600	IN	AAAA	2606:50c0:8002::153
+@	3600	IN	AAAA	2606:50c0:8003::153
+
+; ---------- www → apex (GitHub이 자동 리다이렉트) ----------
+; 반드시 저장소명 없이 <user>.github.io 를 가리킬 것. 끝의 점(.) 포함.
+www	3600	IN	CNAME	codechains.github.io.
+
+; ============================================================
+; 아래는 선택 사항 — 필요할 때 주석(;)을 풀고 값을 채우세요.
+; ============================================================
+
+; ---------- (선택) GitHub 도메인 소유 인증: 도메인 탈취 방지 ----------
+; GitHub 프로필 → Settings → Pages → "Add a domain" 에서 받은 토큰으로 교체.
+;_github-pages-challenge-codechains	3600	IN	TXT	"여기에-발급받은-토큰"
+
+; ---------- (선택) Cloudflare Email Routing: hello@codechains.dev 수신 ----------
+; Cloudflare 대시보드에서 Email Routing을 켜면 아래 레코드가 자동 생성되므로
+; 보통 수동으로 넣을 필요는 없습니다. 참고용으로만 남겨둡니다.
+;@	3600	IN	MX	10 route1.mx.cloudflare.net.
+;@	3600	IN	MX	20 route2.mx.cloudflare.net.
+;@	3600	IN	MX	30 route3.mx.cloudflare.net.
+;@	3600	IN	TXT	"v=spf1 include:_spf.mx.cloudflare.net ~all"
