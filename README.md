@@ -55,6 +55,29 @@ draft: true   # 준비되면 지우거나 false
 ---
 본문...
 ```
+새 글은 `content/_post-template.md` 를 `content/posts/YYYY-MM-DD-슬러그.md` 로 복사해서 시작하세요.
+
+## 검색 최적화(SEO)는 빌드가 자동 처리
+frontmatter만 제대로 채우면 아래가 **모든 글에 자동으로** 들어갑니다. HTML을 직접 손댈 일은 없습니다.
+
+- `<title>` / `meta description` / `canonical`
+- Open Graph (`og:type=article`, `og:title/description/url`, `article:published_time`, `og:locale`)
+- 구조화 데이터 JSON-LD (`BlogPosting` — 제목·요약·발행일·저자·발행처·태그)
+- `hreflang` 한/영 상호 연결, `<time datetime>`, `sitemap.xml` 의 `lastmod`
+
+**빌드가 직접 검사합니다.** 아래가 비어 있으면 빌드가 실패해 배포되지 않습니다.
+
+| 항목 | 없으면 |
+|---|---|
+| `title`, `date`(YYYY-MM-DD), `description` | **오류 → 빌드 중단** |
+| 슬러그 중복 | **오류 → 빌드 중단** (뒤 글이 앞 글을 덮어쓰는 사고 방지) |
+| `description` 40~160자 벗어남, `title` 60자 초과, `tags` 없음 | 경고 (배포는 됨) |
+
+아직 다듬는 중이라 채우지 못했다면 `draft: true` 를 넣으세요. 검사 대상에서 제외됩니다.
+
+### 대표 이미지(선택)
+`assets/og.png` (1200×630 권장) 를 넣고 `content/site.json` 의 `ogImage` 를 `"/assets/og.png"` 로 채우면
+링크 공유 시 썸네일이 붙습니다. 비워두면 이미지 없는 카드로 안전하게 처리됩니다.
 
 ## 배포 설정 (최초 1회)
 - 저장소: `codechains.github.io` (public)

@@ -77,11 +77,74 @@ function loadPosts(dir) {
 }
 const esc = (s) => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 
+/* ---------- SEO 검사 ----------
+   글이 발행될 때마다 검색 최적화 항목이 자동으로 채워지도록, 빌드가 직접 확인합니다.
+   - 없으면 안 되는 것(title/date/description)은 오류 → 빌드 중단 → 배포되지 않음
+   - 품질 문제(설명 길이, 태그 누락 등)는 경고 → 배포는 되지만 로그에 남음
+   초안이라 아직 못 채웠다면 frontmatter 에 draft: true 를 넣으세요. 검사 대상에서 빠집니다. */
+const SEO = { descMin: 40, descMax: 160, titleMax: 60 };
+
+function checkSeo(posts, label) {
+  const errors = [];
+  const warnings = [];
+  const seenSlugs = new Map();
+
+  posts.forEach((p) => {
+    const where = `${label}/${p.slug}`;
+
+    if (!p.title || !String(p.title).trim()) errors.push(`${where}: title 이 없습니다.`);
+    if (!p.date || !/^\d{4}-\d{2}-\d{2}$/.test(p.date)) errors.push(`${where}: date 가 없거나 형식이 잘못됐습니다(YYYY-MM-DD).`);
+    if (!p.description || !String(p.description).trim()) {
+      errors.push(`${where}: description 이 없습니다. 검색결과에 보이는 문장이라 글마다 반드시 달라야 합니다.`);
+    } else {
+      const len = String(p.description).trim().length;
+      if (len < SEO.descMin) warnings.push(`${where}: description 이 ${len}자로 짧습니다(권장 ${SEO.descMin}~${SEO.descMax}자).`);
+      if (len > SEO.descMax) warnings.push(`${where}: description 이 ${len}자로 깁니다. 검색결과에서 뒷부분이 잘립니다(권장 ${SEO.descMax}자 이내).`);
+    }
+
+    if (p.title && String(p.title).length > SEO.titleMax) {
+      warnings.push(`${where}: title 이 ${String(p.title).length}자로 깁니다. 검색결과에서 잘릴 수 있습니다(권장 ${SEO.titleMax}자 이내).`);
+    }
+    if (!(p.tags || []).length) warnings.push(`${where}: tags 가 없습니다.`);
+
+    // 슬러그가 겹치면 나중 글이 앞 글을 덮어써 조용히 사라집니다
+    if (seenSlugs.has(p.slug)) errors.push(`${where}: 슬러그가 "${seenSlugs.get(p.slug)}" 와 겹칩니다. 파일명을 바꾸세요.`);
+    else seenSlugs.set(p.slug, p.slug);
+  });
+
+  return { errors, warnings };
+}
+
+function reportSeo(groups) {
+  const errors = groups.flatMap((g) => g.errors);
+  const warnings = groups.flatMap((g) => g.warnings);
+
+  warnings.forEach((w) => console.warn(`  [SEO 경고] ${w}`));
+  if (errors.length) {
+    console.error("\n[SEO 검사 실패] 아래를 고쳐야 배포됩니다:");
+    errors.forEach((e) => console.error(`  - ${e}`));
+    console.error("\n(아직 다듬는 중이라면 frontmatter 에 draft: true 를 넣어 두세요.)\n");
+    process.exit(1);
+  }
+  if (warnings.length) console.warn("");
+}
+
 const LOGO = `<svg class="logo" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M12.5 19.5l7-7" stroke="url(#g)" stroke-width="2.4" stroke-linecap="round"/><path d="M14.8 9.2l1.7-1.7a4.6 4.6 0 016.5 6.5l-1.7 1.7" stroke="url(#g)" stroke-width="2.4" stroke-linecap="round"/><path d="M17.2 22.8l-1.7 1.7a4.6 4.6 0 01-6.5-6.5l1.7-1.7" stroke="url(#g)" stroke-width="2.4" stroke-linecap="round"/><defs><linearGradient id="g" x1="6" y1="8" x2="26" y2="24" gradientUnits="userSpaceOnUse"><stop stop-color="#6ee7b7"/><stop offset="1" stop-color="#7aa2ff"/></linearGradient></defs></svg>`;
 
 const THEME_SCRIPT = `<script>(function(){try{var t=localStorage.getItem('cc-theme');if(t){document.documentElement.setAttribute('data-theme',t);}}catch(e){}})();</script>`;
 const THEME_TOGGLE_JS = `<script>(function(){var b=document.getElementById('themeBtn');if(!b)return;function cur(){return document.documentElement.getAttribute('data-theme')||'dark';}function set(v){document.documentElement.setAttribute('data-theme',v);try{localStorage.setItem('cc-theme',v);}catch(e){}b.textContent=v==='dark'?'☀':'☾';}b.textContent=cur()==='dark'?'☀':'☾';b.addEventListener('click',function(){set(cur()==='dark'?'light':'dark');});})();</script>`;
 const SUBSCRIBE_JS = `<script>(function(){var f=document.getElementById('subForm');if(!f)return;f.addEventListener('submit',function(e){e.preventDefault();var n=document.getElementById('subNote');if(n)n.style.display='block';});})();</script>`;
+
+/* 언어 자동 분기 — 한국어 홈(/)에서만 동작.
+   1) 사용자가 언어 링크로 직접 고른 적이 있으면(cc-lang) 그 선택을 최우선으로 존중
+   2) 선택 이력이 없으면 브라우저 언어(navigator.languages)를 보고 한국어가 아니면 /en/ 으로 이동
+   국가(IP)가 아니라 언어 설정으로 판단합니다 — 해외의 한국인은 한국어를,
+   국내의 외국인은 영어를 원하기 때문입니다.
+   깜빡임을 없애려고 <head>에서 본문 렌더 전에 실행하고, 히스토리를 더럽히지 않도록 replace 를 씁니다. */
+const LANG_REDIRECT = `<script>(function(){try{var p=localStorage.getItem('cc-lang');if(p==='ko')return;if(p==='en'){location.replace('/en/');return;}var l=navigator.languages||[navigator.language||''];for(var i=0;i<l.length;i++){if(/^ko/i.test(l[i]))return;}location.replace('/en/');}catch(e){}})();</script>`;
+
+/* 언어 링크를 직접 눌렀을 때 그 선택을 기억 → 이후로는 자동 분기가 끼어들지 않음 */
+const LANG_REMEMBER_JS = `<script>(function(){var a=document.getElementById('langLink');if(!a)return;a.addEventListener('click',function(){try{localStorage.setItem('cc-lang',a.getAttribute('data-lang'));}catch(e){}});})();</script>`;
 
 const T = {
   ko: { nav_about: "소개", home: "홈", posts: "글", langAlt: "EN", nl_h: "새 글을 이메일로 받아보기", nl_p: "AI 트랜스폼 여정의 새 글을 가장 먼저 받아보세요. 스팸은 없습니다.", nl_btn: "구독", nl_ph: "이메일 주소", nl_note: "구독 기능은 곧 연결됩니다. 우선 hello@codechains.dev 로 연락 주셔도 좋아요!", ad: "광고 영역 (애드센스 승인 후 표시됩니다)", latest: "최근 글", back: "← 목록으로", readmore: "읽기" },
@@ -89,9 +152,34 @@ const T = {
 };
 
 /* ---------- layout ---------- */
-function layout({ lang, title, description, canonical, langAltHref, active, body }) {
+/* JSON-LD 를 <script> 안에 안전하게 넣기 — 본문에 </script> 가 섞여도 태그가 깨지지 않도록 < 를 이스케이프 */
+function jsonLdTag(obj) {
+  if (!obj) return "";
+  const json = JSON.stringify(obj).replace(/</g, "\\u003c");
+  return `<script type="application/ld+json">${json}</script>\n`;
+}
+
+function layout({ lang, title, description, canonical, langAltHref, active, body, autoLang, noAlt, ogType, published, jsonLd }) {
   const t = T[lang];
   const isEn = lang === "en";
+  // hreflang: 검색엔진에 "같은 글의 다른 언어판"을 알려 각 언어권에 맞는 페이지가 노출되게 함
+  const koHref = isEn ? langAltHref : canonical;
+  const enHref = isEn ? canonical : langAltHref;
+  const altLinks = noAlt
+    ? ""
+    : `<link rel="alternate" hreflang="ko" href="${site.url}${koHref}">
+<link rel="alternate" hreflang="en" href="${site.url}${enHref}">
+<link rel="alternate" hreflang="x-default" href="${site.url}${koHref}">
+`;
+  /* 공유 카드 이미지. site.json 의 ogImage 에 경로(예: "/assets/og.png")를 채우면 활성화됩니다.
+     이미지가 없는데 summary_large_image 를 선언하면 SNS에서 빈 카드가 뜨므로,
+     이미지가 있을 때만 큰 카드를 쓰고 없으면 summary 로 낮춥니다. */
+  const ogImage = site.ogImage
+    ? `<meta property="og:image" content="${site.url}${site.ogImage}">
+<meta property="og:image:alt" content="${esc(site.brand)}">
+<meta name="twitter:image" content="${site.url}${site.ogImage}">
+`
+    : "";
   const homeHref = isEn ? "/en/" : "/";
   const aboutHref = isEn ? "/en/about/" : "/about/";
   const fullTitle = title ? `${title} · ${site.brand}` : `${site.brand} — ${isEn ? site.taglineEn : site.taglineKo}`;
@@ -105,14 +193,21 @@ function layout({ lang, title, description, canonical, langAltHref, active, body
 <title>${esc(fullTitle)}</title>
 <meta name="description" content="${esc(desc)}">
 <link rel="canonical" href="${site.url}${canonical}">
-<meta property="og:type" content="website">
+<meta name="author" content="${esc(site.author)}">
+<meta property="og:type" content="${ogType || "website"}">
+<meta property="og:site_name" content="${esc(site.brand)}">
+<meta property="og:locale" content="${isEn ? "en_US" : "ko_KR"}">
+<meta property="og:locale:alternate" content="${isEn ? "ko_KR" : "en_US"}">
 <meta property="og:title" content="${esc(fullTitle)}">
 <meta property="og:description" content="${esc(desc)}">
 <meta property="og:url" content="${site.url}${canonical}">
-<meta name="twitter:card" content="summary_large_image">
-<link rel="alternate" type="application/rss+xml" title="${site.brand}" href="/feed.xml">
+${published ? `<meta property="article:published_time" content="${published}T09:00:00+09:00">
+<meta property="article:author" content="${esc(site.author)}">
+` : ""}${ogImage}<meta name="twitter:card" content="${ogImage ? "summary_large_image" : "summary"}">
+${altLinks}<link rel="alternate" type="application/rss+xml" title="${site.brand}" href="/feed.xml">
 <link rel="icon" href="/assets/favicon.svg">
 <link rel="stylesheet" href="/assets/style.css">
+${jsonLdTag(jsonLd)}${autoLang ? LANG_REDIRECT : ""}
 ${THEME_SCRIPT}
 </head>
 <body>
@@ -122,7 +217,7 @@ ${THEME_SCRIPT}
     <a href="${homeHref}">${t.home}</a>
     <a href="${aboutHref}">${t.nav_about}</a>
     <span class="sep"></span>
-    <a href="${langAltHref}" title="${t.langAlt}">${t.langAlt}</a>
+    <a id="langLink" data-lang="${isEn ? "ko" : "en"}" href="${langAltHref}" title="${t.langAlt}">${t.langAlt}</a>
     <button class="iconbtn" id="themeBtn" aria-label="theme">☀</button>
   </nav>
 </div></header>
@@ -138,6 +233,7 @@ ${body}
   </span>
 </div></footer>
 ${THEME_TOGGLE_JS}
+${LANG_REMEMBER_JS}
 ${NEWSLETTER_ENABLED ? SUBSCRIBE_JS : ""}
 </body>
 </html>`;
@@ -162,13 +258,41 @@ function newsletter(lang) {
 </section>`;
 }
 
+/* ---------- 구조화 데이터 (schema.org) ---------- */
+const PUBLISHER = {
+  "@type": "Organization",
+  name: site.brand,
+  url: site.url,
+  logo: { "@type": "ImageObject", url: `${site.url}/assets/favicon.svg` },
+};
+const AUTHOR = { "@type": "Person", name: site.author, url: site.url };
+
+function postJsonLd(post, lang, canonical) {
+  const iso = `${post.date}T09:00:00+09:00`;
+  return {
+    "@context": "https://schema.org",
+    "@type": "BlogPosting",
+    headline: post.title,
+    description: post.description || "",
+    inLanguage: lang === "en" ? "en" : "ko",
+    datePublished: iso,
+    dateModified: iso,
+    author: AUTHOR,
+    publisher: PUBLISHER,
+    mainEntityOfPage: { "@type": "WebPage", "@id": `${site.url}${canonical}` },
+    url: `${site.url}${canonical}`,
+    ...((post.tags || []).length ? { keywords: post.tags.join(", ") } : {}),
+    ...(site.ogImage ? { image: `${site.url}${site.ogImage}` } : {}),
+  };
+}
+
 function postListItems(posts, lang) {
   const base = lang === "en" ? "/en/posts/" : "/posts/";
   return posts
     .map((p) => {
       const tags = (p.tags || []).map((x) => `<span class="tag">${esc(x)}</span>`).join("");
       return `<li><a class="post-item" href="${base}${p.slug}/">
-      <time>${fmtDate(p.date, lang)}</time>
+      <time datetime="${p.date}">${fmtDate(p.date, lang)}</time>
       <h2>${esc(p.title)}</h2>
       <p>${esc(p.description || "")}</p>
       ${tags ? `<div class="tags">${tags}</div>` : ""}
@@ -200,7 +324,24 @@ ${postListItems(posts, lang)}
 ${newsletter(lang)}`;
   const canonical = isEn ? "/en/" : "/";
   const langAlt = isEn ? "/" : "/en/";
-  return layout({ lang, title: "", description: intro, canonical, langAltHref: langAlt, active: "home", body });
+  const jsonLd = {
+    "@context": "https://schema.org",
+    "@type": "Blog",
+    name: site.brand,
+    url: `${site.url}${canonical}`,
+    description: intro,
+    inLanguage: isEn ? "en" : "ko",
+    author: AUTHOR,
+    publisher: PUBLISHER,
+    blogPost: posts.map((p) => ({
+      "@type": "BlogPosting",
+      headline: p.title,
+      url: `${site.url}${isEn ? "/en/posts/" : "/posts/"}${p.slug}/`,
+      datePublished: `${p.date}T09:00:00+09:00`,
+    })),
+  };
+  // 자동 언어 분기는 기본 진입점인 한국어 홈(/)에서만. 깊은 링크나 /en/ 은 방문자의 의도로 보고 건드리지 않음
+  return layout({ lang, title: "", description: intro, canonical, langAltHref: langAlt, active: "home", body, autoLang: !isEn, jsonLd });
 }
 
 function buildAbout(lang) {
@@ -214,7 +355,20 @@ function buildAbout(lang) {
 ${newsletter(lang)}`;
   const canonical = isEn ? "/en/about/" : "/about/";
   const langAlt = isEn ? "/about/" : "/en/about/";
-  return layout({ lang, title: parsed.attributes.title, description: parsed.attributes.description, canonical, langAltHref: langAlt, active: "about", body });
+  // 소개 페이지는 인물 정보로 표시 — 검색에서 사람을 찾는 경로(협업·기회 제안)를 열어둠
+  const jsonLd = {
+    "@context": "https://schema.org",
+    "@type": "ProfilePage",
+    url: `${site.url}${canonical}`,
+    inLanguage: isEn ? "en" : "ko",
+    mainEntity: {
+      ...AUTHOR,
+      email: `mailto:${site.email}`,
+      description: parsed.attributes.description || "",
+      sameAs: [site.github],
+    },
+  };
+  return layout({ lang, title: parsed.attributes.title, description: parsed.attributes.description, canonical, langAltHref: langAlt, active: "about", body, jsonLd });
 }
 
 function buildPost(lang, post) {
@@ -223,7 +377,7 @@ function buildPost(lang, post) {
   const tags = (post.tags || []).map((x) => `<span class="tag">${esc(x)}</span>`).join("");
   const body = `<article class="article">
   <div class="article-head">
-    <time>${fmtDate(post.date, lang)}</time>
+    <time datetime="${post.date}">${fmtDate(post.date, lang)}</time>
     <h1>${esc(post.title)}</h1>
     ${tags ? `<div class="tags" style="margin-top:.8rem">${tags}</div>` : ""}
   </div>
@@ -234,7 +388,12 @@ function buildPost(lang, post) {
 ${newsletter(lang)}`;
   const canonical = `${isEn ? "/en/posts/" : "/posts/"}${post.slug}/`;
   const langAlt = `${isEn ? "/posts/" : "/en/posts/"}${post.slug}/`;
-  return layout({ lang, title: post.title, description: post.description, canonical, langAltHref: langAlt, active: "home", body });
+  return layout({
+    lang, title: post.title, description: post.description, canonical, langAltHref: langAlt, active: "home", body,
+    ogType: "article",
+    published: post.date,
+    jsonLd: postJsonLd(post, lang, canonical),
+  });
 }
 
 /* ---------- feeds ---------- */
@@ -255,10 +414,14 @@ function buildFeed(posts) {
 ${items}
 </channel></rss>`;
 }
-function buildSitemap(urls) {
+// 네임스페이스는 반드시 sitemaps.org (복수형). 오타가 나면 Search Console이 사이트맵을 통째로 거부합니다.
+function buildSitemap(entries) {
   return `<?xml version="1.0" encoding="UTF-8"?>
-<urlset xmlns="http://www.sitemap.org/schemas/sitemap/0.9">
-${urls.map((u) => `  <url><loc>${site.url}${u}</loc></url>`).join("\n")}
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+${entries
+    .map(({ loc, lastmod }) =>
+      `  <url><loc>${site.url}${loc}</loc>${lastmod ? `<lastmod>${lastmod}</lastmod>` : ""}</url>`)
+    .join("\n")}
 </urlset>`;
 }
 const FAVICON = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><rect width="32" height="32" rx="7" fill="#0e1116"/><path d="M12.5 19.5l7-7" stroke="#6ee7b7" stroke-width="2.4" stroke-linecap="round"/><path d="M14.8 9.2l1.7-1.7a4.6 4.6 0 016.5 6.5l-1.7 1.7" stroke="#7aa2ff" stroke-width="2.4" stroke-linecap="round"/><path d="M17.2 22.8l-1.7 1.7a4.6 4.6 0 01-6.5-6.5l1.7-1.7" stroke="#6ee7b7" stroke-width="2.4" stroke-linecap="round"/></svg>`;
@@ -267,21 +430,25 @@ const FAVICON = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><re
 const assetCount = copyAssets();
 const koPosts = loadPosts(path.join(CONTENT, "posts"));
 const enPosts = loadPosts(path.join(CONTENT, "en", "posts"));
+reportSeo([checkSeo(koPosts, "ko"), checkSeo(enPosts, "en")]);
 const urls = [];
+// 홈·목록의 lastmod 는 가장 최근 글의 날짜로 — 새 글이 나가면 크롤러가 다시 훑도록
+const latestKo = koPosts[0] && koPosts[0].date;
+const latestEn = enPosts[0] && enPosts[0].date;
 
-urls.push(write("index.html", buildHome("ko", koPosts)) && "/");
-urls.push(write("about/index.html", buildAbout("ko")) && "/about/");
-koPosts.forEach((p) => { write(`posts/${p.slug}/index.html`, buildPost("ko", p)); urls.push(`/posts/${p.slug}/`); });
+write("index.html", buildHome("ko", koPosts)); urls.push({ loc: "/", lastmod: latestKo });
+write("about/index.html", buildAbout("ko")); urls.push({ loc: "/about/" });
+koPosts.forEach((p) => { write(`posts/${p.slug}/index.html`, buildPost("ko", p)); urls.push({ loc: `/posts/${p.slug}/`, lastmod: p.date }); });
 
-write("en/index.html", buildHome("en", enPosts)); urls.push("/en/");
-write("en/about/index.html", buildAbout("en")); urls.push("/en/about/");
-enPosts.forEach((p) => { write(`en/posts/${p.slug}/index.html`, buildPost("en", p)); urls.push(`/en/posts/${p.slug}/`); });
+write("en/index.html", buildHome("en", enPosts)); urls.push({ loc: "/en/", lastmod: latestEn });
+write("en/about/index.html", buildAbout("en")); urls.push({ loc: "/en/about/" });
+enPosts.forEach((p) => { write(`en/posts/${p.slug}/index.html`, buildPost("en", p)); urls.push({ loc: `/en/posts/${p.slug}/`, lastmod: p.date }); });
 
 write("feed.xml", buildFeed(koPosts));
 write("sitemap.xml", buildSitemap(urls));
 // assets/favicon.svg 를 직접 두면 그걸 쓰고, 없으면 기본 파비콘을 생성.
 if (!fs.existsSync(path.join(ASSETS, "favicon.svg"))) write("assets/favicon.svg", FAVICON);
-write("404.html", layout({ lang: "ko", title: "404", description: "페이지를 찾을 수 없습니다.", canonical: "/404.html", langAltHref: "/en/", active: "", body: `<section class="hero"><h1>404</h1><p>이 링크는 아직 사슬에 없네요.</p><div class="cta"><a class="btn btn-primary" href="/">홈으로</a></div></section>` }));
+write("404.html", layout({ lang: "ko", title: "404", description: "페이지를 찾을 수 없습니다.", canonical: "/404.html", langAltHref: "/en/", active: "", noAlt: true, body: `<section class="hero"><h1>404</h1><p>이 링크는 아직 사슬에 없네요.</p><div class="cta"><a class="btn btn-primary" href="/">홈으로</a></div></section>` }));
 write(".nojekyll", "");
 // 커스텀 도메인은 site.json의 customDomain이 채워졌을 때만 생성.
 // (DNS 연결 전에 CNAME이 있으면 github.io 접속이 깨질 수 있음)

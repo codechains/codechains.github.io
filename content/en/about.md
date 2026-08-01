@@ -25,4 +25,6 @@ This is the record of that shift — what happens when someone with ten years of
 
 On a similar path? Come link up — I'd love to hear about yours.
 
+I'm also **open to conversations about new opportunities.** A project, a collaboration, or something I haven't thought of yet — feel free to reach out.
+
 Reach me: [hello@codechains.dev](mailto:hello@codechains.dev)
