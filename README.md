@@ -64,6 +64,12 @@ frontmatter만 제대로 채우면 아래가 **모든 글에 자동으로** 들�
 - Open Graph (`og:type=article`, `og:title/description/url`, `article:published_time`, `og:locale`)
 - 구조화 데이터 JSON-LD (`BlogPosting` — 제목·요약·발행일·저자·발행처·태그)
 - `hreflang` 한/영 상호 연결, `<time datetime>`, `sitemap.xml` 의 `lastmod`
+- **저자 표기** — 제목 위 `날짜 · 글쓴이` 한 줄, 글 하단 저자 카드(이름·소개·소개 페이지/Email/GitHub 링크)
+
+> 모든 글은 `buildPost()` 하나를 거쳐 생성됩니다. 위 항목은 여기에 들어 있어서
+> **새 글을 추가하면 예외 없이 함께 붙습니다.** 글마다 따로 챙길 것이 없습니다.
+> 저자 이름·소개 문구는 `content/site.json` 의 `author` / `authorBioKo` / `authorBioEn` 한 곳에서 관리하며,
+> 여기를 고치면 과거 글까지 전부 다시 반영됩니다.
 
 **빌드가 직접 검사합니다.** 아래가 비어 있으면 빌드가 실패해 배포되지 않습니다.
 
@@ -72,6 +78,12 @@ frontmatter만 제대로 채우면 아래가 **모든 글에 자동으로** 들�
 | `title`, `date`(YYYY-MM-DD), `description` | **오류 → 빌드 중단** |
 | 슬러그 중복 | **오류 → 빌드 중단** (뒤 글이 앞 글을 덮어쓰는 사고 방지) |
 | `description` 40~160자 벗어남, `title` 60자 초과, `tags` 없음 | 경고 (배포는 됨) |
+| 제목·description·본문에 긴 하이픈(`—` `–`) | 경고 (배포는 됨) |
+
+### 문체 규칙: 긴 하이픈을 쓰지 않는다
+독자가 "AI가 쓴 글"이라고 가장 먼저 알아채는 지점이라, 노출되는 모든 텍스트에서 em dash(`—`)와
+en dash(`–`)를 쓰지 않고 쉼표나 마침표로 문장을 다시 구성합니다.
+의도적으로 넣을 때만 직접 넣으며, 그 경우 빌드 경고는 무시해도 됩니다(배포는 정상 진행).
 
 아직 다듬는 중이라 채우지 못했다면 `draft: true` 를 넣으세요. 검사 대상에서 제외됩니다.
 

@@ -69,6 +69,7 @@ function loadPosts(dir) {
         slug: slugOf(f),
         ...parsed.attributes,
         date: normDate(parsed.attributes.date),
+        rawBody: parsed.body, // 검사용 원문(마크다운). 렌더링에는 bodyHtml 을 씁니다.
         bodyHtml: marked.parse(parsed.body),
       };
     })
@@ -106,6 +107,15 @@ function checkSeo(posts, label) {
       warnings.push(`${where}: title 이 ${String(p.title).length}자로 깁니다. 검색결과에서 잘릴 수 있습니다(권장 ${SEO.titleMax}자 이내).`);
     }
     if (!(p.tags || []).length) warnings.push(`${where}: tags 가 없습니다.`);
+
+    /* 긴 하이픈(em dash —, en dash –)은 AI가 쓴 글이라는 인상을 주는 대표적인 흔적이라 기본적으로 쓰지 않습니다.
+       쉼표나 마침표로 대체하세요. 의도적으로 넣은 경우라면 이 경고는 무시하면 됩니다(빌드는 통과). */
+    const dashFields = [["title", p.title], ["description", p.description], ["본문", p.rawBody]];
+    dashFields.forEach(([name, text]) => {
+      if (text && /[—–]/.test(String(text))) {
+        warnings.push(`${where}: ${name}에 긴 하이픈(— 또는 –)이 있습니다. 쉼표나 마침표로 바꾸세요.`);
+      }
+    });
 
     // 슬러그가 겹치면 나중 글이 앞 글을 덮어써 조용히 사라집니다
     if (seenSlugs.has(p.slug)) errors.push(`${where}: 슬러그가 "${seenSlugs.get(p.slug)}" 와 겹칩니다. 파일명을 바꾸세요.`);
@@ -147,8 +157,8 @@ const LANG_REDIRECT = `<script>(function(){try{var p=localStorage.getItem('cc-la
 const LANG_REMEMBER_JS = `<script>(function(){var a=document.getElementById('langLink');if(!a)return;a.addEventListener('click',function(){try{localStorage.setItem('cc-lang',a.getAttribute('data-lang'));}catch(e){}});})();</script>`;
 
 const T = {
-  ko: { nav_about: "소개", home: "홈", posts: "글", langAlt: "EN", nl_h: "새 글을 이메일로 받아보기", nl_p: "AI 트랜스폼 여정의 새 글을 가장 먼저 받아보세요. 스팸은 없습니다.", nl_btn: "구독", nl_ph: "이메일 주소", nl_note: "구독 기능은 곧 연결됩니다. 우선 hello@codechains.dev 로 연락 주셔도 좋아요!", ad: "광고 영역 (애드센스 승인 후 표시됩니다)", latest: "최근 글", back: "← 목록으로", readmore: "읽기" },
-  en: { nav_about: "About", home: "Home", posts: "Posts", langAlt: "한국어", nl_h: "Get new posts by email", nl_p: "Be first to read new posts from the AI transformation journey. No spam.", nl_btn: "Subscribe", nl_ph: "your email", nl_note: "Subscriptions are being wired up. For now, reach me at hello@codechains.dev!", ad: "Ad slot (shown after AdSense approval)", latest: "Latest posts", back: "← All posts", readmore: "Read" },
+  ko: { nav_about: "소개", home: "홈", posts: "글", langAlt: "EN", author_label: "글쓴이", author_more: "소개 보기", nl_h: "새 글을 이메일로 받아보기", nl_p: "AI 트랜스폼 여정의 새 글을 가장 먼저 받아보세요. 스팸은 없습니다.", nl_btn: "구독", nl_ph: "이메일 주소", nl_note: "구독 기능은 곧 연결됩니다. 우선 hello@codechains.dev 로 연락 주셔도 좋아요!", ad: "광고 영역 (애드센스 승인 후 표시됩니다)", latest: "최근 글", back: "← 목록으로", readmore: "읽기" },
+  en: { nav_about: "About", home: "Home", posts: "Posts", langAlt: "한국어", author_label: "Written by", author_more: "About me", nl_h: "Get new posts by email", nl_p: "Be first to read new posts from the AI transformation journey. No spam.", nl_btn: "Subscribe", nl_ph: "your email", nl_note: "Subscriptions are being wired up. For now, reach me at hello@codechains.dev!", ad: "Ad slot (shown after AdSense approval)", latest: "Latest posts", back: "← All posts", readmore: "Read" },
 };
 
 /* ---------- layout ---------- */
@@ -182,9 +192,8 @@ function layout({ lang, title, description, canonical, langAltHref, active, body
     : "";
   const homeHref = isEn ? "/en/" : "/";
   const aboutHref = isEn ? "/en/about/" : "/about/";
-  const fullTitle = title ? `${title} · ${site.brand}` : `${site.brand} — ${isEn ? site.taglineEn : site.taglineKo}`;
+  const fullTitle = title ? `${title} · ${site.brand}` : `${site.brand} · ${isEn ? site.taglineEn : site.taglineKo}`;
   const desc = description || (isEn ? site.descriptionEn : site.descriptionKo);
-  const adBlock = `<div class="ad-slot">${t.ad}</div>\n<!-- AdSense: 승인 후 아래에 <ins class="adsbygoogle"> 코드를 넣고 위 .ad-slot 문구를 교체하세요. -->`;
   return `<!doctype html>
 <html lang="${isEn ? "en" : "ko"}" data-theme="dark">
 <head>
@@ -227,8 +236,6 @@ ${body}
 <footer class="site-footer"><div class="wrap">
   <span>© ${String(site.author)} · ${isEn ? "Built with care" : "코드체인"}</span>
   <span class="foot-links">
-    <a href="mailto:${site.email}">Email</a>
-    <a href="${site.github}">GitHub</a>
     <a href="/feed.xml">RSS</a>
   </span>
 </div></footer>
@@ -244,6 +251,11 @@ ${NEWSLETTER_ENABLED ? SUBSCRIBE_JS : ""}
    (마크업·문구·스크립트는 그대로 보존돼 있어 되돌리는 데 이 한 줄이면 됩니다) */
 const NEWSLETTER_ENABLED = false;
 
+/* 광고 영역 노출 스위치.
+   애드센스 승인 후 true 로 바꾸면 글 하단에 자리가 다시 생깁니다.
+   그때 buildPost 의 .ad-slot 를 <ins class="adsbygoogle"> 코드로 교체하세요. */
+const ADS_ENABLED = false;
+
 function newsletter(lang) {
   if (!NEWSLETTER_ENABLED) return "";
   const t = T[lang];
@@ -258,6 +270,28 @@ function newsletter(lang) {
 </section>`;
 }
 
+/* ---------- 저자 ----------
+   글 끝에 "누가 썼는가"를 사람이 볼 수 있게 남깁니다.
+   구글 E-E-A-T(경험·전문성·권위·신뢰) 신호이자, 일반적인 글의 형식이기도 합니다.
+   같은 정보를 JSON-LD 의 author 로도 내보내 크롤러가 사람과 글을 연결할 수 있게 합니다. */
+const authorBio = (lang) => (lang === "en" ? site.authorBioEn : site.authorBioKo) || "";
+
+function authorCard(lang) {
+  const t = T[lang];
+  const aboutHref = lang === "en" ? "/en/about/" : "/about/";
+  return `<aside class="author-card">
+  <div class="author-avatar" aria-hidden="true">${LOGO}</div>
+  <div class="author-body">
+    <p class="author-label">${t.author_label}</p>
+    <p class="author-name">${esc(site.author)}</p>
+    <p class="author-bio">${esc(authorBio(lang))}</p>
+    <p class="author-links">
+      <a href="${aboutHref}">${t.author_more}</a>
+    </p>
+  </div>
+</aside>`;
+}
+
 /* ---------- 구조화 데이터 (schema.org) ---------- */
 const PUBLISHER = {
   "@type": "Organization",
@@ -266,6 +300,12 @@ const PUBLISHER = {
   logo: { "@type": "ImageObject", url: `${site.url}/assets/favicon.svg` },
 };
 const AUTHOR = { "@type": "Person", name: site.author, url: site.url };
+const authorNode = (lang) => ({
+  ...AUTHOR,
+  description: authorBio(lang),
+  email: `mailto:${site.email}`,
+  sameAs: [site.github],
+});
 
 function postJsonLd(post, lang, canonical) {
   const iso = `${post.date}T09:00:00+09:00`;
@@ -277,7 +317,7 @@ function postJsonLd(post, lang, canonical) {
     inLanguage: lang === "en" ? "en" : "ko",
     datePublished: iso,
     dateModified: iso,
-    author: AUTHOR,
+    author: authorNode(lang),
     publisher: PUBLISHER,
     mainEntityOfPage: { "@type": "WebPage", "@id": `${site.url}${canonical}` },
     url: `${site.url}${canonical}`,
@@ -307,7 +347,7 @@ function buildHome(lang, posts) {
   const isEn = lang === "en";
   const tagline = isEn ? site.taglineEn : site.taglineKo;
   const intro = isEn
-    ? "The journey of moving into AI — built and documented in the open, one link at a time."
+    ? "The journey of moving into AI, built and documented in the open, one link at a time."
     : "AI로 일하는 방식으로 전환하는 여정을, 공개된 곳에서 하나씩 이어 붙여 기록합니다.";
   const body = `<section class="hero">
   <h1>${isEn ? "Chaining code into a<br><span class=\"grad\">new career.</span>" : "이어 붙인 기록이,<br><span class=\"grad\">커리어가 된다.</span>"}</h1>
@@ -377,12 +417,17 @@ function buildPost(lang, post) {
   const tags = (post.tags || []).map((x) => `<span class="tag">${esc(x)}</span>`).join("");
   const body = `<article class="article">
   <div class="article-head">
-    <time datetime="${post.date}">${fmtDate(post.date, lang)}</time>
+    <p class="article-meta">
+      <time datetime="${post.date}">${fmtDate(post.date, lang)}</time>
+      <span class="dot" aria-hidden="true">·</span>
+      <a class="byline" href="${isEn ? "/en/about/" : "/about/"}" rel="author">${esc(site.author)}</a>
+    </p>
     <h1>${esc(post.title)}</h1>
     ${tags ? `<div class="tags" style="margin-top:.8rem">${tags}</div>` : ""}
   </div>
   <div class="prose">${post.bodyHtml}</div>
-  ${(function(){return `<div class="ad-slot">${t.ad}</div>`;})()}
+  ${authorCard(lang)}
+  ${ADS_ENABLED ? `<div class="ad-slot">${t.ad}</div>` : ""}
   <a class="backlink" href="${isEn ? "/en/" : "/"}">${t.back}</a>
 </article>
 ${newsletter(lang)}`;

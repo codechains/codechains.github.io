@@ -1,0 +1,12 @@
+{
+  // 이 저장소의 모든 텍스트 파일은 UTF-8(BOM 없음)입니다.
+  // 한국어 윈도우에서는 편집기가 BOM 없는 UTF-8 파일을 CP949로 잘못 추측해
+  // 한글 주석이 "???ъ씠" 처럼 깨져 보이는 일이 있어, 추측을 끄고 UTF-8로 고정합니다.
+  "files.encoding": "utf8",
+  "files.autoGuessEncoding": false,
+  "files.eol": "\n",
+  "[markdown]": { "files.encoding": "utf8" },
+  "[css]": { "files.encoding": "utf8" },
+  "[javascript]": { "files.encoding": "utf8" },
+  "[json]": { "files.encoding": "utf8" }
+}

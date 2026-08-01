@@ -15,5 +15,6 @@ preview-*.html
 .DS_Store
 Thumbs.db
 *.log
-.vscode/
+.vscode/*
+!.vscode/settings.json
 .idea/
