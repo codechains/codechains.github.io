@@ -143,8 +143,8 @@ const LANG_REDIRECT = `<script>(function(){try{var p=localStorage.getItem('cc-la
 const LANG_REMEMBER_JS = `<script>(function(){var a=document.getElementById('langLink');if(!a)return;a.addEventListener('click',function(){try{localStorage.setItem('cc-lang',a.getAttribute('data-lang'));}catch(e){}});})();</script>`;
 
 const T = {
-  ko: { nav_about: "소개", home: "홈", posts: "글", langAlt: "EN", author_label: "글쓴이", author_more: "소개 보기", nl_h: "새 글을 이메일로 받아보기", nl_p: "AI 트랜스폼 여정의 새 글을 가장 먼저 받아보세요. 스팸은 없습니다.", nl_btn: "구독", nl_ph: "이메일 주소", nl_note: "구독 기능은 곧 연결됩니다. 우선 hello@codechains.dev 로 연락 주셔도 좋아요!", ad: "광고 영역 (애드센스 승인 후 표시됩니다)", latest: "최근 글", back: "← 목록으로", readmore: "읽기" },
-  en: { nav_about: "About", home: "Home", posts: "Posts", langAlt: "한국어", author_label: "Written by", author_more: "About me", nl_h: "Get new posts by email", nl_p: "Be first to read new posts from the AI transformation journey. No spam.", nl_btn: "Subscribe", nl_ph: "your email", nl_note: "Subscriptions are being wired up. For now, reach me at hello@codechains.dev!", ad: "Ad slot (shown after AdSense approval)", latest: "Latest posts", back: "← All posts", readmore: "Read" },
+  ko: { nav_about: "소개", home: "홈", posts: "글", langAlt: "EN", author_label: "글쓴이", author_more: "소개 보기", contact: "비슷한 상황이라면 편하게 물어보세요.", nl_h: "새 글을 이메일로 받아보기", nl_p: "AI 트랜스폼 여정의 새 글을 가장 먼저 받아보세요. 스팸은 없습니다.", nl_btn: "구독", nl_ph: "이메일 주소", nl_note: "구독 기능은 곧 연결됩니다. 우선 hello@codechains.dev 로 연락 주셔도 좋아요!", ad: "광고 영역 (애드센스 승인 후 표시됩니다)", latest: "최근 글", back: "← 목록으로", readmore: "읽기" },
+  en: { nav_about: "About", home: "Home", posts: "Posts", langAlt: "한국어", author_label: "Written by", author_more: "About me", contact: "In a similar spot? Feel free to ask.", nl_h: "Get new posts by email", nl_p: "Be first to read new posts from the AI transformation journey. No spam.", nl_btn: "Subscribe", nl_ph: "your email", nl_note: "Subscriptions are being wired up. For now, reach me at hello@codechains.dev!", ad: "Ad slot (shown after AdSense approval)", latest: "Latest posts", back: "← All posts", readmore: "Read" },
 };
 
 /* 공유 카드 이미지의 실제 크기. og:image:width/height 를 같이 보내면
@@ -267,6 +267,12 @@ ${NEWSLETTER_ENABLED ? SUBSCRIBE_JS : ""}
    (마크업·문구·스크립트는 그대로 보존돼 있어 되돌리는 데 이 한 줄이면 됩니다) */
 const NEWSLETTER_ENABLED = false;
 
+/* 글 끝 연락 한 줄 노출 스위치.
+   읽고 마음이 움직인 사람이 갈 곳이 없으면 그대로 닫고 나갑니다. 그래서 한 줄만 둡니다.
+   판매 문구를 붙이지 않는 이유는, 이 글들이 읽히는 이유가 광고가 아니라 기록이기 때문입니다.
+   문구를 고치려면 T 의 contact 를 손보세요. */
+const CONTACT_ENABLED = true;
+
 /* 광고 영역 노출 스위치.
    애드센스 승인 후 true 로 바꾸면 글 하단에 자리가 다시 생깁니다.
    그때 buildPost 의 .ad-slot 를 <ins class="adsbygoogle"> 코드로 교체하세요. */
@@ -291,6 +297,11 @@ function newsletter(lang) {
    구글 E-E-A-T(경험·전문성·권위·신뢰) 신호이자, 일반적인 글의 형식이기도 합니다.
    같은 정보를 JSON-LD 의 author 로도 내보내 크롤러가 사람과 글을 연결할 수 있게 합니다. */
 const authorBio = (lang) => (lang === "en" ? site.authorBioEn : site.authorBioKo) || "";
+
+function contactLine(lang) {
+  if (!CONTACT_ENABLED) return "";
+  return `<p class="post-contact">${T[lang].contact} <a href="mailto:${esc(site.email)}">${esc(site.email)}</a></p>`;
+}
 
 function authorCard(lang) {
   const t = T[lang];
@@ -443,6 +454,7 @@ function buildPost(lang, post) {
   </div>
   <div class="prose">${post.bodyHtml}</div>
   ${authorCard(lang)}
+  ${contactLine(lang)}
   ${ADS_ENABLED ? `<div class="ad-slot">${t.ad}</div>` : ""}
   <a class="backlink" href="${isEn ? "/en/" : "/"}">${t.back}</a>
 </article>

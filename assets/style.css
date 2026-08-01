@@ -479,6 +479,18 @@ main.wrap {
 .author-links a { color: var(--accent-2); }
 .author-links a:hover { text-decoration: underline; }
 
+/* 글 끝의 연락 한 줄.
+   테두리도 배경도 없는 평범한 문장으로 둡니다. 상자에 넣는 순간 광고처럼 읽히고,
+   그러면 글 전체의 신뢰까지 같이 깎입니다. */
+.post-contact {
+  margin: 18px 2px 0;
+  color: var(--muted);
+  font-size: .9rem;
+  line-height: 1.65;
+}
+.post-contact a { color: var(--accent-2); }
+.post-contact a:hover { text-decoration: underline; }
+
 @media (max-width: 560px) {
   .author-card { padding: 18px; gap: 13px; }
   .author-avatar { width: 44px; height: 44px; }
