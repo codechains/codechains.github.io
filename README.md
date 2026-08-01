@@ -8,6 +8,8 @@ GitHub Actions가 push마다 자동으로 빌드→배포합니다. 빌드 결�
 codechains.github.io/
 ├── content/                 # 글·소개 원본(마크다운). ko = content/, en = content/en/
 │   └── site.json            # 사이트 설정(브랜드·태그라인·이메일·customDomain 등)
+├── assets/                  # 정적 원본(스타일 등). 빌드가 site/assets/ 로 그대로 복사
+│   └── style.css            # 사이트 디자인 원본 — 여기를 고치면 배포에 반영됨
 ├── scripts/build.js         # 마크다운 → 정적 HTML 변환기 (계속 발전 가능)
 ├── package.json / package-lock.json
 ├── .github/workflows/deploy.yml   # push 시 자동 빌드+배포
@@ -17,6 +19,7 @@ codechains.github.io/
 
 ## 진실의 원본은 마크다운 하나
 - 에이전트가 글을 "생성"하든, 사람이 "수정"하든 → 모두 `content/`의 **같은 .md 파일**을 편집하는 것.
+- 디자인을 고칠 땐 `assets/style.css`를 수정 (`site/assets/style.css`는 복사본이라 덮어써짐).
 - **빌드된 `site/`의 HTML은 절대 직접 고치지 말 것** (빌드 때마다 덮어써짐).
 - 특수 꾸밈이 필요하면 .md 안에 HTML을 직접 섞어도 됨.
 

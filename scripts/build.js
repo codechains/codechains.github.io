@@ -1,6 +1,7 @@
 /* ============================================================
    codechains blog — static build
-   Reads markdown from /content, writes static HTML to /site.
+   Reads markdown from /content and static files from /assets,
+   writes static HTML to /site.
    No build step runs on GitHub; it only serves the output.
    Run:  node scripts/build.js
    ============================================================ */
@@ -11,6 +12,7 @@ const fm = require("front-matter");
 
 const ROOT = path.join(__dirname, "..");
 const CONTENT = path.join(ROOT, "content");
+const ASSETS = path.join(ROOT, "assets"); // 커밋되는 정적 원본(css 등) → site/assets/ 로 복사
 const OUT = path.join(ROOT, "site");
 const site = JSON.parse(fs.readFileSync(path.join(CONTENT, "site.json"), "utf8"));
 
@@ -25,6 +27,22 @@ function write(rel, html) {
   fs.writeFileSync(out, html);
   return rel;
 }
+/* /assets 의 정적 원본을 그대로 site/assets/ 로 복사.
+   (css·이미지 등은 build.js가 생성하는 게 아니라 커밋된 파일이므로 반드시 복사해야 배포에 포함됨) */
+function copyAssets() {
+  if (!fs.existsSync(ASSETS)) {
+    throw new Error("assets/ 폴더가 없습니다. CSS 등 정적 원본은 assets/ 안에 두고 커밋하세요.");
+  }
+  const files = fs.readdirSync(ASSETS);
+  if (!files.includes("style.css")) {
+    throw new Error("assets/style.css 가 없습니다. 스타일 없이 배포되는 걸 막기 위해 빌드를 중단합니다.");
+  }
+  const dest = path.join(OUT, "assets");
+  ensureDir(dest);
+  fs.cpSync(ASSETS, dest, { recursive: true });
+  return files.length;
+}
+
 function slugOf(file) {
   return file.replace(/\.md$/, "").replace(/^\d{4}-\d{2}-\d{2}-/, "");
 }
@@ -240,6 +258,7 @@ ${urls.map((u) => `  <url><loc>${site.url}${u}</loc></url>`).join("\n")}
 const FAVICON = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><rect width="32" height="32" rx="7" fill="#0e1116"/><path d="M12.5 19.5l7-7" stroke="#6ee7b7" stroke-width="2.4" stroke-linecap="round"/><path d="M14.8 9.2l1.7-1.7a4.6 4.6 0 016.5 6.5l-1.7 1.7" stroke="#7aa2ff" stroke-width="2.4" stroke-linecap="round"/><path d="M17.2 22.8l-1.7 1.7a4.6 4.6 0 01-6.5-6.5l1.7-1.7" stroke="#6ee7b7" stroke-width="2.4" stroke-linecap="round"/></svg>`;
 
 /* ---------- run ---------- */
+const assetCount = copyAssets();
 const koPosts = loadPosts(path.join(CONTENT, "posts"));
 const enPosts = loadPosts(path.join(CONTENT, "en", "posts"));
 const urls = [];
@@ -254,7 +273,8 @@ enPosts.forEach((p) => { write(`en/posts/${p.slug}/index.html`, buildPost("en", 
 
 write("feed.xml", buildFeed(koPosts));
 write("sitemap.xml", buildSitemap(urls));
-write("assets/favicon.svg", FAVICON);
+// assets/favicon.svg 를 직접 두면 그걸 쓰고, 없으면 기본 파비콘을 생성.
+if (!fs.existsSync(path.join(ASSETS, "favicon.svg"))) write("assets/favicon.svg", FAVICON);
 write("404.html", layout({ lang: "ko", title: "404", description: "페이지를 찾을 수 없습니다.", canonical: "/404.html", langAltHref: "/en/", active: "", body: `<section class="hero"><h1>404</h1><p>이 링크는 아직 사슬에 없네요.</p><div class="cta"><a class="btn btn-primary" href="/">홈으로</a></div></section>` }));
 write(".nojekyll", "");
 // 커스텀 도메인은 site.json의 customDomain이 채워졌을 때만 생성.
@@ -262,4 +282,4 @@ write(".nojekyll", "");
 if (site.customDomain) write("CNAME", site.customDomain + "\n");
 write("robots.txt", `User-agent: *\nAllow: /\nSitemap: ${site.url}/sitemap.xml\n`);
 
-console.log(`Built ${koPosts.length} KO + ${enPosts.length} EN posts, ${urls.length} URLs.`);
+console.log(`Built ${koPosts.length} KO + ${enPosts.length} EN posts, ${urls.length} URLs, ${assetCount} asset file(s) copied.`);
