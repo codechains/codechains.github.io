@@ -50,6 +50,18 @@ function normDate(v) {
   if (v instanceof Date) return v.toISOString().slice(0, 10);
   return String(v).slice(0, 10);
 }
+/* 발행 시각. 목록 정렬과 RSS·구조화 데이터의 시각이 모두 이 값을 씁니다.
+
+   date 에 날짜만 적으면(2026-08-01) 그날 오전 9시로 봅니다.
+   같은 날에 두 편 이상 낼 때는 시각까지 적으면 나중 시각이 위로 옵니다.
+     date: 2026-08-01 14:00:00 +09:00
+   파일 수정시각이나 git 이력을 쓰지 않는 이유는, 배포 서버가 저장소를 새로 받아갈 때
+   그 값들이 전부 초기화되어 로컬과 배포본의 순서가 달라지기 때문입니다. */
+function normStamp(v, isoDate) {
+  const raw = v instanceof Date ? v.toISOString() : String(v).trim().replace(" ", "T");
+  const hasTime = /T\d{2}:\d{2}/.test(raw) && !/T00:00:00(\.000)?Z?$/.test(raw);
+  return hasTime ? raw : `${isoDate}T09:00:00+09:00`;
+}
 function fmtDate(iso, lang) {
   const [y, m, d] = iso.split("-").map(Number);
   if (lang === "en") {
@@ -68,16 +80,20 @@ function loadPosts(dir) {
     .filter((f) => f.endsWith(".md"))
     .map((f) => {
       const parsed = fm(read(path.join(dir, f)));
+      const date = normDate(parsed.attributes.date);
       return {
         slug: slugOf(f),
         file: f, // 원본 파일명. 관리 페이지에서 이 파일을 바로 열기 위해 남깁니다.
         ...parsed.attributes,
-        date: normDate(parsed.attributes.date),
+        date,
+        stamp: normStamp(parsed.attributes.date, date),
         rawBody: parsed.body, // 검사용 원문(마크다운). 렌더링에는 bodyHtml 을 씁니다.
         bodyHtml: marked.parse(parsed.body),
       };
     })
-    .sort((a, b) => String(b.date).localeCompare(String(a.date)));
+    /* 나중에 발행한 글이 항상 위로. 시각이 완전히 같으면 파일명 역순으로 갈라
+       로컬과 배포본이 같은 순서를 내도록 합니다(읽어들인 순서에 기대지 않음). */
+    .sort((a, b) => (new Date(b.stamp) - new Date(a.stamp)) || String(b.file).localeCompare(String(a.file)));
 }
 const published = (posts) => posts.filter((p) => !p.draft); // draft: true → 공개 안 함(버전 관리는 됨)
 const esc = (s) => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
@@ -101,6 +117,7 @@ function checkSeo(posts, label) {
     bySlug.get(slug).push(item);
   };
   const seenSlugs = new Map();
+  const seenStamps = new Map();
 
   posts.forEach((p) => {
     const err = (m) => add(p.slug, "error", m);
@@ -133,6 +150,13 @@ function checkSeo(posts, label) {
     // 슬러그가 겹치면 나중 글이 앞 글을 덮어써 조용히 사라집니다
     if (seenSlugs.has(p.slug)) err(`슬러그가 "${seenSlugs.get(p.slug)}" 와 겹칩니다. 파일명을 바꾸세요.`);
     else seenSlugs.set(p.slug, p.slug);
+
+    /* 발행 시각이 완전히 같으면 어느 글이 위로 갈지 글 스스로 정하지 못합니다.
+       파일명 역순으로 갈라 두긴 하지만, 의도한 순서인지는 사람만 알 수 있으므로 알려줍니다. */
+    const stampKey = String(new Date(p.stamp).getTime());
+    if (seenStamps.has(stampKey)) {
+      warn(`발행 시각이 "${seenStamps.get(stampKey)}" 와 같아 목록 순서가 정해지지 않습니다. 나중에 낸 글의 date 에 시각을 넣으세요(예: date: ${p.date} 14:00:00 +09:00).`);
+    } else seenStamps.set(stampKey, p.slug);
   });
 
   const lines = (level) => issues.filter((i) => i.level === level).map((i) => `${label}/${i.slug}: ${i.msg}`);
@@ -224,7 +248,7 @@ function layout({ lang, title, description, canonical, langAltHref, active, body
 <meta property="og:title" content="${esc(fullTitle)}">
 <meta property="og:description" content="${esc(desc)}">
 <meta property="og:url" content="${site.url}${canonical}">
-${published ? `<meta property="article:published_time" content="${published}T09:00:00+09:00">
+${published ? `<meta property="article:published_time" content="${published}">
 <meta property="article:author" content="${esc(site.author)}">
 ` : ""}${ogImage}<meta name="twitter:card" content="${ogImage ? "summary_large_image" : "summary"}">
 ${altLinks}<link rel="alternate" type="application/rss+xml" title="${site.brand}" href="/feed.xml">
@@ -322,7 +346,7 @@ const authorNode = (lang) => ({
 });
 
 function postJsonLd(post, lang, canonical) {
-  const iso = `${post.date}T09:00:00+09:00`;
+  const iso = post.stamp;
   return {
     "@context": "https://schema.org",
     "@type": "BlogPosting",
@@ -391,7 +415,7 @@ ${newsletter(lang)}`;
       "@type": "BlogPosting",
       headline: p.title,
       url: `${site.url}${isEn ? "/en/posts/" : "/posts/"}${p.slug}/`,
-      datePublished: `${p.date}T09:00:00+09:00`,
+      datePublished: p.stamp,
     })),
   };
   // 자동 언어 분기는 기본 진입점인 한국어 홈(/)에서만. 깊은 링크나 /en/ 은 방문자의 의도로 보고 건드리지 않음
@@ -450,7 +474,7 @@ ${newsletter(lang)}`;
   return layout({
     lang, title: post.title, description: post.description, canonical, langAltHref: langAlt, active: "home", body,
     ogType: "article",
-    published: post.date,
+    published: post.stamp,
     jsonLd: postJsonLd(post, lang, canonical),
   });
 }
@@ -461,7 +485,7 @@ function buildFeed(posts) {
     <title>${esc(p.title)}</title>
     <link>${site.url}/posts/${p.slug}/</link>
     <guid>${site.url}/posts/${p.slug}/</guid>
-    <pubDate>${new Date(p.date + "T09:00:00+09:00").toUTCString()}</pubDate>
+    <pubDate>${new Date(p.stamp).toUTCString()}</pubDate>
     <description>${esc(p.description || "")}</description>
   </item>`).join("\n");
   return `<?xml version="1.0" encoding="UTF-8"?>
