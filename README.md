@@ -26,8 +26,19 @@ codechains.github.io/
 ## 글 쓰는 흐름
 1. `content/posts/`에 `YYYY-MM-DD-슬러그.md` 생성(아래 frontmatter 참고). 영어판은 `content/en/posts/`에 같은 파일명.
 2. Cursor 등에서 내용을 직접 수정.
-3. 로컬 미리보기: `npm install`(최초 1회) → `node scripts/build.js` → `site/index.html` 확인.
+3. 로컬 미리보기: `npm install`(최초 1회) → `npm run dev` → http://localhost:4000 접속.
 4. 만족하면 `git add -A && git commit -m "..." && git push` → Actions가 자동 배포.
+
+## 로컬 개발 서버
+```
+npm run dev     # http://localhost:4000, 저장하면 자동 재빌드 + 브라우저 자동 새로고침
+npm run build   # 1회 빌드만 (site/ 생성)
+```
+- `content/`, `assets/`, `scripts/build.js` 를 저장하면 즉시 다시 빌드되고 열려 있는 탭이 스스로 새로고침됩니다.
+- 응답에 `no-store` 를 붙이므로 **로컬에서는 Ctrl+F5가 필요 없습니다.**
+- `site/index.html` 을 파일로 직접 열지 말 것 — HTML이 `/assets/style.css` 처럼 루트 절대경로를 쓰기 때문에
+  `file://` 로 열면 CSS가 안 잡힙니다. 반드시 위 서버로 확인하세요.
+- 포트를 바꾸려면 `PORT=5000 npm run dev` (PowerShell: `$env:PORT=5000; npm run dev`).
 
 ## 초안(draft)
 frontmatter에 `draft: true`를 넣으면 **커밋·백업은 되지만 사이트에는 공개되지 않음**.
