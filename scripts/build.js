@@ -9,6 +9,8 @@ const fs = require("fs");
 const path = require("path");
 const { marked } = require("marked");
 const fm = require("front-matter");
+// 글을 읽는 규칙은 make-og.js 와 함께 씁니다(슬러그·날짜 해석이 어긋나지 않도록)
+const { read, fmtDate, loadPosts, published, ogCardPath } = require("./posts");
 
 const ROOT = path.join(__dirname, "..");
 const CONTENT = path.join(ROOT, "content");
@@ -19,7 +21,6 @@ const site = JSON.parse(fs.readFileSync(path.join(CONTENT, "site.json"), "utf8")
 marked.setOptions({ gfm: true, breaks: false });
 
 /* ---------- helpers ---------- */
-const read = (p) => fs.readFileSync(p, "utf8");
 const ensureDir = (p) => fs.mkdirSync(p, { recursive: true });
 function write(rel, html) {
   const out = path.join(OUT, rel);
@@ -43,59 +44,6 @@ function copyAssets() {
   return files.length;
 }
 
-function slugOf(file) {
-  return file.replace(/\.md$/, "").replace(/^\d{4}-\d{2}-\d{2}-/, "");
-}
-function normDate(v) {
-  if (v instanceof Date) return v.toISOString().slice(0, 10);
-  return String(v).slice(0, 10);
-}
-/* 발행 시각. 목록 정렬과 RSS·구조화 데이터의 시각이 모두 이 값을 씁니다.
-
-   date 에 날짜만 적으면(2026-08-01) 그날 오전 9시로 봅니다.
-   같은 날에 두 편 이상 낼 때는 시각까지 적으면 나중 시각이 위로 옵니다.
-     date: 2026-08-01 14:00:00 +09:00
-   파일 수정시각이나 git 이력을 쓰지 않는 이유는, 배포 서버가 저장소를 새로 받아갈 때
-   그 값들이 전부 초기화되어 로컬과 배포본의 순서가 달라지기 때문입니다. */
-function normStamp(v, isoDate) {
-  const raw = v instanceof Date ? v.toISOString() : String(v).trim().replace(" ", "T");
-  const hasTime = /T\d{2}:\d{2}/.test(raw) && !/T00:00:00(\.000)?Z?$/.test(raw);
-  return hasTime ? raw : `${isoDate}T09:00:00+09:00`;
-}
-function fmtDate(iso, lang) {
-  const [y, m, d] = iso.split("-").map(Number);
-  if (lang === "en") {
-    const months = ["January","February","March","April","May","June","July","August","September","October","November","December"];
-    return `${months[m - 1]} ${d}, ${y}`;
-  }
-  return `${y}.${String(m).padStart(2, "0")}.${String(d).padStart(2, "0")}`;
-}
-/* 초안까지 포함한 전체 글을 최신순으로 읽습니다.
-   공개용으로 쓸 때는 published() 로 한 번 걸러서 씁니다.
-   (초안도 읽는 이유: 로컬 관리 페이지가 "아직 안 낸 글"을 보여줘야 하기 때문) */
-function loadPosts(dir) {
-  if (!fs.existsSync(dir)) return [];
-  return fs
-    .readdirSync(dir)
-    .filter((f) => f.endsWith(".md"))
-    .map((f) => {
-      const parsed = fm(read(path.join(dir, f)));
-      const date = normDate(parsed.attributes.date);
-      return {
-        slug: slugOf(f),
-        file: f, // 원본 파일명. 관리 페이지에서 이 파일을 바로 열기 위해 남깁니다.
-        ...parsed.attributes,
-        date,
-        stamp: normStamp(parsed.attributes.date, date),
-        rawBody: parsed.body, // 검사용 원문(마크다운). 렌더링에는 bodyHtml 을 씁니다.
-        bodyHtml: marked.parse(parsed.body),
-      };
-    })
-    /* 나중에 발행한 글이 항상 위로. 시각이 완전히 같으면 파일명 역순으로 갈라
-       로컬과 배포본이 같은 순서를 내도록 합니다(읽어들인 순서에 기대지 않음). */
-    .sort((a, b) => (new Date(b.stamp) - new Date(a.stamp)) || String(b.file).localeCompare(String(a.file)));
-}
-const published = (posts) => posts.filter((p) => !p.draft); // draft: true → 공개 안 함(버전 관리는 됨)
 const esc = (s) => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 
 /* ---------- SEO 검사 ----------
@@ -201,16 +149,29 @@ const T = {
 
 /* 공유 카드 이미지의 실제 크기. og:image:width/height 를 같이 보내면
    카카오톡·페이스북 같은 곳이 이미지를 받기 전에도 자리를 잡아, 처음 공유할 때
-   미리보기가 비어 보이는 일이 줄어듭니다. 파일에서 직접 읽으므로 카드를 다시 만들어도 맞습니다. */
+   미리보기가 비어 보이는 일이 줄어듭니다. 파일에서 직접 읽으므로 카드를 다시 만들어도 맞습니다.
+   같은 파일을 여러 페이지가 쓰므로 한 번 읽은 것은 기억해 둡니다. */
+const dimsCache = new Map();
 function pngDims(rel) {
+  if (dimsCache.has(rel)) return dimsCache.get(rel);
+  let dims = null;
   try {
     const b = fs.readFileSync(path.join(ASSETS, rel.replace(/^\/assets\//, "")));
     const sig = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
-    if (b.slice(0, 8).equals(sig)) return { w: b.readUInt32BE(16), h: b.readUInt32BE(20) };
+    if (b.slice(0, 8).equals(sig)) dims = { w: b.readUInt32BE(16), h: b.readUInt32BE(20) };
   } catch (e) {}
-  return null;
+  dimsCache.set(rel, dims);
+  return dims;
 }
-const OG_DIMS = site.ogImage ? pngDims(site.ogImage) : null;
+
+/* 글이 자기 카드를 가지고 있으면 그것을, 없으면 사이트 공용 카드를 씁니다.
+   카드를 아직 안 만든 글도 빈 미리보기로 나가지 않도록 하는 안전장치입니다.
+   (새 글을 쓰고 npm run og 를 아직 안 돌린 상태가 여기에 해당합니다) */
+function cardFor(lang, slug) {
+  const rel = ogCardPath(lang, slug);
+  if (fs.existsSync(path.join(ASSETS, rel.replace(/^\/assets\//, "")))) return rel;
+  return site.ogImage;
+}
 
 /* ---------- layout ---------- */
 /* JSON-LD 를 <script> 안에 안전하게 넣기 — 본문에 </script> 가 섞여도 태그가 깨지지 않도록 < 를 이스케이프 */
@@ -220,7 +181,7 @@ function jsonLdTag(obj) {
   return `<script type="application/ld+json">${json}</script>\n`;
 }
 
-function layout({ lang, title, description, canonical, langAltHref, active, body, autoLang, noAlt, ogType, published, jsonLd }) {
+function layout({ lang, title, description, canonical, langAltHref, active, body, autoLang, noAlt, ogType, published, jsonLd, card }) {
   const t = T[lang];
   const isEn = lang === "en";
   // hreflang: 검색엔진에 "같은 글의 다른 언어판"을 알려 각 언어권에 맞는 페이지가 노출되게 함
@@ -235,12 +196,14 @@ function layout({ lang, title, description, canonical, langAltHref, active, body
   /* 공유 카드 이미지. site.json 의 ogImage 에 경로(예: "/assets/og.png")를 채우면 활성화됩니다.
      이미지가 없는데 summary_large_image 를 선언하면 SNS에서 빈 카드가 뜨므로,
      이미지가 있을 때만 큰 카드를 쓰고 없으면 summary 로 낮춥니다. */
-  const ogImage = site.ogImage
-    ? `<meta property="og:image" content="${site.url}${site.ogImage}">
-<meta property="og:image:alt" content="${esc(site.brand)}">
-${OG_DIMS ? `<meta property="og:image:width" content="${OG_DIMS.w}">
-<meta property="og:image:height" content="${OG_DIMS.h}">
-` : ""}<meta name="twitter:image" content="${site.url}${site.ogImage}">
+  const cardSrc = card || site.ogImage;
+  const dims = cardSrc ? pngDims(cardSrc) : null;
+  const ogImage = cardSrc
+    ? `<meta property="og:image" content="${site.url}${cardSrc}">
+<meta property="og:image:alt" content="${esc(title || site.brand)}">
+${dims ? `<meta property="og:image:width" content="${dims.w}">
+<meta property="og:image:height" content="${dims.h}">
+` : ""}<meta name="twitter:image" content="${site.url}${cardSrc}">
 `
     : "";
   const homeHref = isEn ? "/en/" : "/";
@@ -375,7 +338,7 @@ function postJsonLd(post, lang, canonical) {
     mainEntityOfPage: { "@type": "WebPage", "@id": `${site.url}${canonical}` },
     url: `${site.url}${canonical}`,
     ...((post.tags || []).length ? { keywords: post.tags.join(", ") } : {}),
-    ...(site.ogImage ? { image: `${site.url}${site.ogImage}` } : {}),
+    ...(cardFor(lang, post.slug) ? { image: `${site.url}${cardFor(lang, post.slug)}` } : {}),
   };
 }
 
@@ -490,6 +453,7 @@ ${newsletter(lang)}`;
     lang, title: post.title, description: post.description, canonical, langAltHref: langAlt, active: "home", body,
     ogType: "article",
     published: post.stamp,
+    card: cardFor(lang, post.slug), // 글마다 제목이 박힌 카드. 없으면 공용 카드로 내려갑니다
     jsonLd: postJsonLd(post, lang, canonical),
   });
 }
