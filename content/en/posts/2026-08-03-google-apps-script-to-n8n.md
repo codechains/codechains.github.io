@@ -5,11 +5,11 @@ description: My quote automation already worked in Google Apps Script. I brought
 tags: [AI automation, AI transformation, n8n, Google Apps Script, workflow automation]
 ---
 
-In the last post I wrote that I'd [finished quote automation in Google Apps Script](/en/posts/google-apps-script-quote-automation/). Then I went and added n8n on top. This post is about why.
+In the last post I wrote that I'd finished [quote automation](/en/posts/google-apps-script-quote-automation/) in Google Apps Script. Then I went and added n8n on top. This post is about why.
 
-## First, Apps Script succeeded
+## A successful quote automation, built with Claude Code
 
-The quote automation still runs on Apps Script today. A request comes in, prices and discount rates get calculated, the exchange rate is applied, and a PDF goes out by email. No human hands in the middle.
+The quote automation still runs on Google Apps Script today. A request comes in, prices and discount rates get calculated, the exchange rate is applied, and a PDF goes out by email. No human hands in the middle.
 
 And in this territory [Google Apps Script](https://developers.google.com/apps-script/overview) is genuinely excellent. One line of `SpreadsheetApp` and you're on the sheet. One line of `GmailApp` and the mail is out. You don't write a single line of authentication code. No server, no cost. **If a job starts and ends inside Google, there aren't many faster paths than this.**
 
@@ -37,9 +37,20 @@ The gap in debugging time was the biggest one. Automations cost you more time to
 
 ### 2. There is no 6 minute ceiling
 
-Google Apps Script allows 6 minutes per execution, and on a free Google account, 90 minutes of total trigger runtime per day. The exact numbers are in the [Google Apps Script quotas page](https://developers.google.com/apps-script/guides/services/quotas).
+One thing worth clearing up here. If your company pays for Google Workspace, it's natural to assume this limit doesn't apply to you. It does. **Six minutes per execution is identical on paid Workspace.** It is not something a higher plan unlocks.
 
-Most days you never touch it. Then you write a batch that walks 500 customers and you hit the wall, and from that moment you're writing code that remembers where it stopped so it can resume. Code that has nothing to do with the job you set out to do. [Self-hosted n8n](https://docs.n8n.io/hosting/) has no such limit.
+What does change with the account type is the daily totals.
+
+| Quota | Free Google account | Paid Workspace |
+|---|---|---|
+| **Runtime per execution** | **6 min** | **6 min, same** |
+| Total trigger runtime per day | 90 min | 6 hours |
+| Email recipients per day | 100 | 1,500 |
+| URL Fetch calls per day | 20,000 | 100,000 |
+
+The full table is on the [Google Apps Script quotas page](https://developers.google.com/apps-script/guides/services/quotas).
+
+Most days you never touch it. Then you write a batch that walks 500 customers, and what stops you first isn't the daily total, it's **the 6 minutes on a single execution**. From that moment you're writing code that remembers where it stopped so it can resume. Code that has nothing to do with the job you set out to do. [Self-hosted n8n](https://docs.n8n.io/hosting/) has no such limit.
 
 ### 3. Can you hand it to someone else?
 
