@@ -167,8 +167,8 @@ jobs.push({
 });
 
 const groups = [
-  { lang: "ko", posts: published(loadPosts(path.join(CONTENT, "posts"))) },
-  { lang: "en", posts: published(loadPosts(path.join(CONTENT, "en", "posts"))) },
+  { lang: "ko", posts: published(loadPosts(path.join(CONTENT, "posts-kr"))) },
+  { lang: "en", posts: published(loadPosts(path.join(CONTENT, "posts-en"))) },
 ];
 
 groups.forEach(({ lang, posts }) => {

@@ -434,7 +434,7 @@ ${newsletter(lang)}`;
 
 function buildAbout(lang) {
   const isEn = lang === "en";
-  const file = isEn ? path.join(CONTENT, "en", "about.md") : path.join(CONTENT, "about.md");
+  const file = path.join(CONTENT, isEn ? "about-en.md" : "about.md");
   const parsed = fm(read(file));
   const body = `<article class="article">
   <div class="article-head"><h1>${esc(parsed.attributes.title)}</h1></div>
@@ -523,8 +523,10 @@ const FAVICON = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><re
 
 /* ---------- run ---------- */
 const assetCount = copyAssets();
-const koAll = loadPosts(path.join(CONTENT, "posts"));
-const enAll = loadPosts(path.join(CONTENT, "en", "posts"));
+// 언어별 글 폴더는 이름만 다르고 나란히 있습니다(posts-kr / posts-en).
+// 소개 페이지도 같은 규칙으로 about.md / about-en.md 입니다.
+const koAll = loadPosts(path.join(CONTENT, "posts-kr"));
+const enAll = loadPosts(path.join(CONTENT, "posts-en"));
 const koPosts = published(koAll);
 const enPosts = published(enAll);
 // 초안은 검사 대상이 아닙니다(아직 다듬는 중이므로). 공개되는 글만 봅니다.

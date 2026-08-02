@@ -19,10 +19,11 @@ const ROOT = path.join(__dirname, "..");
 const OUT = path.join(ROOT, "site");
 const BUILD = path.join(__dirname, "build.js");
 const ADMIN = path.join(__dirname, "admin.js");
+const THREADS = path.join(__dirname, "threads.js"); // 관리 페이지의 쓰레드 탭이 이 규칙으로 원고를 읽습니다
 const PORT = Number(process.env.PORT) || 4000;
 
 // 변경을 감시할 대상 — 빌드 입력이 되는 것들만
-const WATCH = [path.join(ROOT, "content"), path.join(ROOT, "assets"), BUILD, ADMIN];
+const WATCH = [path.join(ROOT, "content"), path.join(ROOT, "assets"), BUILD, ADMIN, THREADS];
 
 const MIME = {
   ".html": "text/html; charset=utf-8",

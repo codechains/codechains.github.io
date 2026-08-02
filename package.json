@@ -6,7 +6,8 @@
   "scripts": {
     "build": "node scripts/build.js",
     "dev": "node scripts/serve.js",
-    "og": "node scripts/make-og.js"
+    "og": "node scripts/make-og.js",
+    "thread": "node scripts/threads.js"
   },
   "keywords": [],
   "author": "",

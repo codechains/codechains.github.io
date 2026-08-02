@@ -6,7 +6,7 @@ GitHub Actions가 push마다 자동으로 빌드→배포합니다. 빌드 결�
 ## 구조
 ```
 codechains.github.io/
-├── content/                 # 글·소개 원본(마크다운). ko = content/, en = content/en/
+├── content/                 # 글·소개 원본(마크다운). ko = content/posts-kr/, en = content/posts-en/
 │   └── site.json            # 사이트 설정(브랜드·태그라인·이메일·customDomain 등)
 ├── assets/                  # 정적 원본(스타일 등). 빌드가 site/assets/ 로 그대로 복사
 │   └── style.css            # 사이트 디자인 원본 — 여기를 고치면 배포에 반영됨
@@ -24,7 +24,7 @@ codechains.github.io/
 - 특수 꾸밈이 필요하면 .md 안에 HTML을 직접 섞어도 됨.
 
 ## 글 쓰는 흐름
-1. `content/posts/`에 `YYYY-MM-DD-슬러그.md` 생성(아래 frontmatter 참고). 영어판은 `content/en/posts/`에 같은 파일명.
+1. `content/posts-kr/`에 `YYYY-MM-DD-슬러그.md` 생성(아래 frontmatter 참고). 영어판은 `content/posts-en/`에 같은 파일명.
 2. Cursor 등에서 내용을 직접 수정.
 3. 로컬 미리보기: `npm install`(최초 1회) → `npm run dev` → http://localhost:4000 접속.
 4. 만족하면 `git add -A && git commit -m "..." && git push` → Actions가 자동 배포.
@@ -55,7 +55,7 @@ draft: true   # 준비되면 지우거나 false
 ---
 본문...
 ```
-새 글은 `content/_post-template.md` 를 `content/posts/YYYY-MM-DD-슬러그.md` 로 복사해서 시작하세요.
+새 글은 `content/_post-template.md` 를 `content/posts-kr/YYYY-MM-DD-슬러그.md` 로 복사해서 시작하세요.
 
 ## 검색 최적화(SEO)는 빌드가 자동 처리
 frontmatter만 제대로 채우면 아래가 **모든 글에 자동으로** 들어갑니다. HTML을 직접 손댈 일은 없습니다.
