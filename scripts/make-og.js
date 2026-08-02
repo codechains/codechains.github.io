@@ -141,7 +141,7 @@ function cardHtml({ lang, heading, date, sub, fit }) {
   <div class="middle"><h1${fit ? ` id="fit"` : ""}>${heading}</h1></div>
   <footer>
     <span class="sub">${esc(sub)}</span>
-    <span class="url">${esc(site.customDomain || "codechains.dev")}</span>
+    <span class="url">${esc(site.customDomain || "kadecho.dev")}</span>
   </footer>
   <div class="bar"></div>
 </div>

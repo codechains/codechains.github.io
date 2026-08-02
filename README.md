@@ -94,5 +94,5 @@ en dash(`–`)를 쓰지 않고 쉼표나 마침표로 문장을 다시 구성�
 ## 배포 설정 (최초 1회)
 - 저장소: `codechains.github.io` (public)
 - **Settings → Pages → Source = "GitHub Actions"**
-- 커스텀 도메인 연결 시: `content/site.json`의 `customDomain`을 `codechains.dev`로 채우면 빌드가 CNAME을 생성.
+- 커스텀 도메인 연결 시: `content/site.json`의 `customDomain`을 `kadecho.dev`로 채우면 빌드가 CNAME을 생성.
   (DNS 연결 전에는 비워둘 것 — 비어 있으면 CNAME을 만들지 않음)

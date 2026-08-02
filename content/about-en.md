@@ -27,4 +27,4 @@ On a similar path? Come link up. I'd love to hear about yours.
 
 I'm also **open to conversations about new opportunities.** A project, a collaboration, or something I haven't thought of yet. Feel free to reach out.
 
-Reach me: [hello@codechains.dev](mailto:hello@codechains.dev)
+Reach me: [hello@kadecho.dev](mailto:hello@kadecho.dev)

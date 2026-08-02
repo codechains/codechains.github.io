@@ -27,4 +27,4 @@ AI 시대를 맞으면서 그 벽이 무너지는 걸 느낍니다. 이제는 �
 
 함께 만들어볼 일이나 **새로운 기회에 대한 이야기도 언제든 환영합니다.** 프로젝트, 협업, 혹은 아직 제가 생각해보지 못한 형태라도 좋습니다. 편하게 말 걸어 주세요.
 
-연락: [hello@codechains.dev](mailto:hello@codechains.dev)
+연락: [hello@kadecho.dev](mailto:hello@kadecho.dev)

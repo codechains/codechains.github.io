@@ -1,9 +1,9 @@
 {
   "brand": "codechains",
   "brandKo": "코드체인",
-  "url": "https://codechains.dev",
+  "url": "https://kadecho.dev",
   "githubUrl": "https://codechains.github.io",
-  "email": "hello@codechains.dev",
+  "email": "hello@kadecho.dev",
   "author": "codechains",
   "taglineKo": "이어 붙인 코드가 무언가가 되듯, 이어 붙인 기록이 커리어가 된다.",
   "taglineEn": "Chaining code, learning, and small wins into an AI-powered career.",
@@ -14,5 +14,5 @@
   "authorBioEn": "10 years of running a small IT company, now documenting the shift to working with AI in the open. What actually got built, where it broke, and how it got resolved.",
   "adsenseClient": "",
   "ogImage": "/assets/og.png",
-  "customDomain": "codechains.dev"
+  "customDomain": "kadecho.dev"
 }
