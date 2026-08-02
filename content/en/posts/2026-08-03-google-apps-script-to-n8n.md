@@ -58,7 +58,7 @@ The full table is on the [Google Apps Script quotas page](https://developers.goo
 
 So the moment you write a batch that walks 500 customers, what stops you first isn't the daily total, it's **the 6 minutes on a single execution**. From there you're writing code that records how far it got so the next run can pick up where it left off. Code that has nothing to do with the job you set out to do.
 
-[Self-hosted n8n](https://docs.n8n.io/hosting/) runs on your own server, so there's no such cap. However long it takes, it runs until it's done.
+n8n has no constraint like this, one that cuts an execution off on elapsed time alone.
 
 ### 3. Can you hand it to someone else?
 
