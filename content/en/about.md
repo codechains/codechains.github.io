@@ -1,19 +1,19 @@
 ---
 title: About
-description: Ten years of running a small IT company, and building hands-on again now that AI has removed the constraints.
+description: 10 years of running a small IT company, and building hands-on again now that AI has removed the constraints.
 ---
 
-**CodeChains** started from a simple idea: code, connected continuously, builds something. My move into AI works the same way. Not one big leap, but small daily experiments and notes that link together, one at a time, into a new career.
+**Codechains** started from a simple idea: code, connected continuously, builds something. My move into AI works the same way. Not one big leap, but small daily experiments and notes that link together, one at a time, into a new career.
 
 This blog is the record of that chain: what I actually build with AI, where I get stuck, and how I work through it. The wins and the dead ends, both kept honestly.
 
-## Ten years, and a door reopening
+## 10 years, and a door reopening
 
-I have **ten years of experience running a small IT company**. There was never a shortage of things I wanted to build. But against the real constraints of time and people, most of them got filed under "someday." That list got long.
+I have **10 years of experience running a small IT company**. There was never a shortage of things I wanted to build. But against the real constraints of time and people, most of them got filed under "someday." That list got long.
 
 The AI era is knocking those walls down. I can now **build and improve the IT infrastructure for growing my business with my own hands.** Things I wouldn't have dared attempt before have gone from "can't do" to "haven't done yet." With the constraints gone, I'm working through that backlog one item at a time.
 
-This is the record of that shift. What happens when someone with ten years of running a company picks up AI and starts building things directly again.
+This is the record of that shift. What happens when someone with 10 years of running a company picks up AI and starts building things directly again.
 
 ## What I write about
 
