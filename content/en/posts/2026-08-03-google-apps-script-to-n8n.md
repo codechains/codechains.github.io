@@ -35,9 +35,15 @@ n8n stores **the full input and output of every step** on every run. I can open 
 
 The gap in debugging time was the biggest one. Automations cost you more time to repair than to build.
 
-### 2. There is no 6 minute ceiling
+### 2. At 6 minutes, the script is cut off mid-job
 
-One thing worth clearing up here. If your company pays for Google Workspace, it's natural to assume this limit doesn't apply to you. It does. **Six minutes per execution is identical on paid Workspace.** It is not something a higher plan unlocks.
+Google Apps Script doesn't run on your computer. **It runs on Google's servers.** You're borrowing someone else's machine for free, so Google caps how long any single run is allowed to take. That cap is **6 minutes**.
+
+What happens at 6 minutes? No warning, and no pausing and picking up again. **It just stops in the middle of whatever it was doing.** If it was working through 100 records, you get 37 and the rest simply never happened. And the script has no memory of where it stopped.
+
+Building and sending one quote takes seconds, so it never comes near the limit. The problem is **anything that loops over many records in one go**.
+
+And here's the part that's easy to get wrong. If your company pays for Google Workspace, it's natural to assume this limit is gone, or at least generous. **Six minutes is identical on paid Workspace.** It is not something a higher plan unlocks.
 
 What does change with the account type is the daily totals.
 
@@ -50,7 +56,9 @@ What does change with the account type is the daily totals.
 
 The full table is on the [Google Apps Script quotas page](https://developers.google.com/apps-script/guides/services/quotas).
 
-Most days you never touch it. Then you write a batch that walks 500 customers, and what stops you first isn't the daily total, it's **the 6 minutes on a single execution**. From that moment you're writing code that remembers where it stopped so it can resume. Code that has nothing to do with the job you set out to do. [Self-hosted n8n](https://docs.n8n.io/hosting/) has no such limit.
+So the moment you write a batch that walks 500 customers, what stops you first isn't the daily total, it's **the 6 minutes on a single execution**. From there you're writing code that records how far it got so the next run can pick up where it left off. Code that has nothing to do with the job you set out to do.
+
+[Self-hosted n8n](https://docs.n8n.io/hosting/) runs on your own server, so there's no such cap. However long it takes, it runs until it's done.
 
 ### 3. Can you hand it to someone else?
 
