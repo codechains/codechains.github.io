@@ -2,7 +2,7 @@
 title: Why I Started My AI Transformation
 date: 2026-08-01
 description: The first post. Why I decided to move into AI, and why I chose to document the whole thing in the open.
-tags: [start, reflection]
+tags: [AI transformation, AI automation, getting started, reflection]
 ---
 
 Let me start with the decision.

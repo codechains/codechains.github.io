@@ -2,7 +2,7 @@
 title: Quotes in 5 Minutes, Not a Day, With Google Apps Script
 date: 2026-08-02
 description: USD list prices, per-product discounts, and volume tiers kept us writing quotes by hand for years. Claude and Google Apps Script cut it to five minutes.
-tags: [automation, Google Apps Script, Google Workspace, sales]
+tags: [AI automation, AI transformation, Claude, Google Apps Script, Google Workspace]
 ---
 
 After moving our two company websites [over to Cloudflare](/en/posts/wix-to-cloudflare/), I opened the list of postponed work again. The most urgent item on it was automating quote delivery.

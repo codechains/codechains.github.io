@@ -2,7 +2,7 @@
 title: Google Apps Script Already Worked. Here's Why I Added n8n
 date: 2026-08-03
 description: My quote automation already worked in Google Apps Script. I brought in n8n anyway. Why I added a second tool, and which jobs Google Apps Script still owns.
-tags: [automation, n8n, Google Apps Script, operations]
+tags: [AI automation, AI transformation, n8n, Google Apps Script, workflow automation]
 ---
 
 In the last post I wrote that I'd [finished quote automation in Google Apps Script](/en/posts/google-apps-script-quote-automation/). Then I went and added n8n on top. This post is about why.
@@ -29,7 +29,7 @@ That was the trigger. Once I started using it, more reasons showed up.
 
 ### 1. When something fails, the data is still there
 
-An Google Apps Script execution log contains whatever I remembered to put in `Logger.log`. When it fails, one email with a stack trace arrives, and that's it. **What value came in and broke it is gone.** So I add more logging, run it again, and wait for it to break again.
+A Google Apps Script execution log contains whatever I remembered to put in `Logger.log`. When it fails, one email with a stack trace arrives, and that's it. **What value came in and broke it is gone.** So I add more logging, run it again, and wait for it to break again.
 
 n8n stores **the full input and output of every step** on every run. I can open a failure from three weeks ago, look at exactly what arrived at the fifth step, fix the value, and re-run from there.
 
@@ -45,7 +45,7 @@ Most days you never touch it. Then you write a batch that walks 500 customers an
 
 For me this was the decisive one.
 
-When I deliver an Google Apps Script automation, the deliverable is **code**. The owner can't open it, and the next person can't easily pick it up. From the builder's side that can look like job security.
+When I deliver a Google Apps Script automation, the deliverable is **code**. The owner can't open it, and the next person can't easily pick it up. From the builder's side that can look like job security.
 
 In practice it works the other way around. **It blocks the contract.** "What happens to us if this person disappears" is the single biggest reason a small business hesitates to hire outside help. When I'm the one hiring, I hesitate for exactly the same reason.
 
@@ -57,7 +57,7 @@ Google Apps Script lives attached to a specific Google account. If that account 
 
 ### 5. It gives maintenance a basis you can invoice
 
-One honest note. An Google Apps Script delivery gets read as "he wrote some code once," which makes a monthly maintenance fee awkward to bring up. n8n comes with **a running server, monitoring, and backups**, which are visible, concrete things. A monthly fee explains itself.
+One honest note. A Google Apps Script delivery gets read as "he wrote some code once," which makes a monthly maintenance fee awkward to bring up. n8n comes with **a running server, monitoring, and backups**, which are visible, concrete things. A monthly fee explains itself.
 
 You might question whether that belongs in a technical decision. I think it has to. An arrangement that isn't sustainable as a business ends with the client's automation being neglected too.
 

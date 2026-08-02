@@ -2,7 +2,7 @@
 title: From Wix to Cloudflare, $408 a Year Down to Zero
 date: 2026-08-01 14:00:00 +09:00
 description: Two company websites, two days with Claude and Cursor. How I moved sites with no source files, kept the search traffic, and got the redesign I had postponed.
-tags: [infrastructure, cost, cloudflare, migration]
+tags: [AI transformation, Claude, Cursor, website migration, Cloudflare, cost]
 ---
 
 In the first post I said I'd change how I work, using AI. So where do you start?
