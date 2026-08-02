@@ -3,9 +3,7 @@ title: About
 description: 10 years of running a small IT company, and building hands-on again now that AI has removed the constraints.
 ---
 
-**Codechains** started from a simple idea: code, connected continuously, builds something. My move into AI works the same way. Not one big leap, but small daily experiments and notes that link together, one at a time, into a new career.
-
-This blog is the record of that chain: what I actually build with AI, where I get stuck, and how I work through it. The wins and the dead ends, both kept honestly.
+This blog is a record of changing how I work with AI: what I actually build, where I get stuck, and how I work through it. The wins and the dead ends, both kept honestly.
 
 ## 10 years, and a door reopening
 

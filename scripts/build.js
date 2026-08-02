@@ -246,7 +246,7 @@ ${THEME_SCRIPT}
 </head>
 <body>
 <header class="site-header"><div class="wrap">
-  <a class="brand" href="${homeHref}">${LOGO}<span>codechains</span></a>
+  <a class="brand" href="${homeHref}">${LOGO}<span>kadecho.dev</span></a>
   <nav class="nav">
     <a href="${homeHref}">${t.home}</a>
     <a href="${aboutHref}">${t.nav_about}</a>
