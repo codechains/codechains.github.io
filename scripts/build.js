@@ -224,7 +224,12 @@ ${dims ? `<meta property="og:image:width" content="${dims.w}">
     : "";
   const homeHref = isEn ? "/en/" : "/";
   const aboutHref = isEn ? "/en/about/" : "/about/";
-  const fullTitle = title ? `${title} · ${site.brand}` : `${site.brand} · ${isEn ? site.taglineEn : site.taglineKo}`;
+  /* 홈 제목은 태그라인과 따로 둡니다.
+     태그라인은 첫 화면에서 사람을 세우는 문장이라 길어도 되지만,
+     검색 결과의 제목은 한글 기준 30자 안팎에서 잘립니다. 같은 문장을 두 자리에 쓰면
+     한쪽이 반드시 손해를 봅니다. homeTitle 이 비어 있으면 예전처럼 태그라인을 씁니다. */
+  const homeTitle = (isEn ? site.homeTitleEn : site.homeTitleKo) || (isEn ? site.taglineEn : site.taglineKo);
+  const fullTitle = title ? `${title} · ${site.brand}` : `${site.brand} · ${homeTitle}`;
   const desc = description || (isEn ? site.descriptionEn : site.descriptionKo);
   return `<!doctype html>
 <html lang="${isEn ? "en" : "ko"}" data-theme="dark">
@@ -405,14 +410,24 @@ function buildHome(lang, posts) {
   const tagline = isEn ? site.taglineEn : site.taglineKo;
   const intro = isEn
     ? "The journey of moving into AI, built and documented in the open, one link at a time."
-    : "AI로 일하는 방식으로 전환하는 여정을, 공개된 곳에서 하나씩 이어 붙여 기록합니다.";
+    : "작은 회사를 운영하며 미뤄둔 IT 일을 AI로 하나씩 처리한 기록. 홈페이지 이전으로 연 59만원을 줄이고, 견적 발송을 하루에서 5분으로 바꾼 과정을 그대로 적습니다.";
+
+  /* 한국어 첫 화면은 쓰레드에서 넘어온 사장님이 봅니다.
+     "코드", "커리어", "여정" 같은 말은 IT 에서 밀려나 있던 사람에게 자기 얘기로 안 읽힙니다.
+     본인이 겪는 상태(몇 년째 미뤄둔 일)를 먼저 말하고, 도구 이름을 구체적으로 붙입니다.
+
+     버튼도 순서를 바꿨습니다. 쓰레드 글을 보고 들어온 사람이 원하는 것은
+     소개가 아니라 그 이야기의 나머지입니다. */
   const body = `${langNotice(lang)}
 <section class="hero">
-  <h1>${isEn ? "Chaining code into a<br><span class=\"grad\">new career.</span>" : "이어 붙인 기록이,<br><span class=\"grad\">커리어가 된다.</span>"}</h1>
+  <h1>${isEn ? "Chaining code into a<br><span class=\"grad\">new career.</span>" : "몇 년째 미뤄둔 일을<br><span class=\"grad\">하나씩 끝내고 있습니다.</span>"}</h1>
   <p>${esc(tagline)}</p>
   <div class="cta">
-    <a class="btn btn-primary" href="${isEn ? "/en/about/" : "/about/"}">${isEn ? "About me" : "소개 보기"}</a>
-    <a class="btn btn-ghost" href="#latest">${isEn ? "Read posts" : "글 읽기"}</a>
+    ${isEn
+      ? `<a class="btn btn-primary" href="/en/about/">About me</a>
+    <a class="btn btn-ghost" href="#latest">Read posts</a>`
+      : `<a class="btn btn-primary" href="#latest">글 읽기</a>
+    <a class="btn btn-ghost" href="/about/">소개 보기</a>`}
   </div>
 </section>
 <h2 class="section-title" id="latest">${t.latest}</h2>
