@@ -191,6 +191,17 @@ function queueStats(queue) {
     run = p.kind === "work" ? run + 1 : 0;
     worst = Math.max(worst, run);
   });
+
+  /* 같은 블로그 글에서 뽑은 편이 연달아 나가는 길이.
+     편수보다 이쪽이 피로를 만듭니다. 나흘 내리 같은 주제면 기록이 아니라 연재 광고로 읽히고,
+     첫 편에 흥미를 느껴 팔로우한 사람이 사흘째에 언팔합니다.
+     그래서 배치를 순서대로 흘리지 않고 겹쳐서 흘립니다. */
+  let topicRun = 0;
+  let worstTopic = 0;
+  queue.forEach((p, i) => {
+    topicRun = i > 0 && p.source && p.source === queue[i - 1].source ? topicRun + 1 : 1;
+    worstTopic = Math.max(worstTopic, topicRun);
+  });
   return {
     total: queue.length,
     left: left.length,
@@ -202,6 +213,7 @@ function queueStats(queue) {
     ready: left.filter((p) => p.status === "ready").length,
     undated: left.filter((p) => !p.date).length,
     longestWorkRun: worst,
+    longestTopicRun: worstTopic,
   };
 }
 
@@ -273,7 +285,11 @@ const isWeekend = (date) => [0, 6].includes(new Date(`${date}T00:00:00Z`).getUTC
 function daySize(date, left) {
   if (left <= 2) return left;
   // 요일을 먼저 봅니다. 남은 편수로 먼저 자르면 마지막 주말에 네 편이 몰립니다.
-  let size = Math.min(isWeekend(date) ? 2 : pick([2, 3, 3, 4, 4]), left);
+  /* 평일 2~3편, 주말 2편. 상한을 3으로 둔 이유는 두 가지입니다.
+     하나, 소재가 마르는 속도. 블로그 한 편에서 아홉 편이 나오는데 하루 네 편이면 이틀 반이면 끝납니다.
+     둘, 줄이는 건 눈에 띕니다. 네 편 하다가 두 편으로 내려가면 식은 계정으로 읽히지만,
+     두세 편으로 시작해서 올리는 건 아무도 눈치채지 못하면서 계정이 커지는 것처럼 보입니다. */
+  let size = Math.min(isWeekend(date) ? 2 : pick([2, 3, 3]), left);
   if (left - size === 1) size = Math.min(size + 1, 4, left); // 다음 날 한 편만 남기지 않기
   if (left - size === 1) size = Math.max(size - 1, 2); // 그래도 하나 남으면 두 편을 넘기기
   return Math.min(size, left);

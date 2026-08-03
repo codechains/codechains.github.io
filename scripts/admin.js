@@ -41,7 +41,9 @@ const STYLE = `
 :root{color-scheme:dark}
 *{box-sizing:border-box}
 body{margin:0;background:#0e1116;color:#e6e9ef;font:14px/1.5 ui-sans-serif,system-ui,"Segoe UI","Malgun Gothic",sans-serif}
-.wrap{max-width:1200px;margin:0 auto;padding:2rem 1.2rem 4rem}
+/* 쓰레드 큐가 하루 네 칸짜리 격자라 1200px 로는 칸이 너무 좁아집니다.
+   글 목록은 표라서 넓어져도 손해가 없어 페이지 전체를 넓혔습니다. */
+.wrap{max-width:1440px;margin:0 auto;padding:2rem 1.2rem 4rem}
 h1{font-size:1.3rem;margin:0 0 .3rem}
 .sub{color:#8b93a7;font-size:.85rem;margin:0 0 1.4rem}
 .bar{display:flex;gap:.6rem;align-items:center;flex-wrap:wrap;margin-bottom:1rem;position:sticky;top:0;background:#0e1116;padding:.8rem 0;z-index:2}
@@ -113,21 +115,32 @@ pre.seg-body{margin:0;padding:.7rem .75rem;white-space:pre-wrap;word-break:break
 .b-life{background:#2a1f30;color:#d8a9e8}
 .when{font-variant-numeric:tabular-nums;color:#a7b0c2;font-size:.82rem;white-space:nowrap}
 
-/* 하루가 한 줄, 한 줄에 카드 세 장 */
+/* 하루가 한 줄, 한 줄에 카드 넉 장 */
 section.day{margin-bottom:1.4rem}
 .day-head{display:flex;gap:.7rem;align-items:baseline;flex-wrap:wrap;padding:0 .1rem .5rem;border-bottom:1px solid #1c222c;margin-bottom:.8rem}
 .day-head .when{font-size:.95rem;font-weight:600;color:#e6e9ef}
-/* 열은 셋으로 고정합니다. 하루 세 편이 운영 기준이라, 폭에 따라 열 수가 달라지면
-   같은 요일이 어제와 다른 모양으로 보여 계획표로 못 씁니다. */
-.day-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:.8rem;align-items:start}
-@media (max-width:900px){.day-grid{grid-template-columns:1fr}}
-.day-grid .th{margin:0;height:100%;display:flex;flex-direction:column}
-.day-grid .th .seg{flex:1}
-.th-foot{display:flex;gap:.6rem;align-items:center;flex-wrap:wrap;margin-top:.6rem;padding-top:.5rem;border-top:1px solid #1c222c}
-.th-foot .edit,.th-foot .th-src,.th-foot .th-meta{font-size:.74rem}
+/* 열은 넷으로 고정합니다. 하루 최대 네 편이라 네 칸이면 어떤 날이든 한 줄에 들어갑니다.
+   폭에 따라 열 수가 달라지면 같은 요일이 어제와 다른 모양으로 보여 계획표로 못 씁니다.
+   편이 두세 개인 날은 오른쪽 칸이 비는데, 그 빈칸 자체가 "이날은 적게 올린다"는 정보입니다. */
+.day-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:.7rem;align-items:start}
+@media (max-width:1180px){.day-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media (max-width:760px){.day-grid{grid-template-columns:1fr}}
+
+/* 네 칸으로 나뉘면 카드 하나가 좁아지므로 격자 안에서만 글자와 여백을 줄입니다.
+   (쓰레드 탭 밖의 카드 스타일은 그대로 둡니다) */
+.day-grid .th{margin:0;height:100%;display:flex;flex-direction:column;padding:.65rem .75rem}
+.day-grid .th .seg{flex:1;margin-top:.45rem}
+.day-grid .th-head{gap:.3rem;margin-bottom:.1rem}
+.day-grid .when{font-size:.76rem}
+.day-grid .badge{font-size:.66rem;padding:.05rem .32rem;margin-right:.12rem}
+.day-grid .seg-head{padding:.25rem .45rem;font-size:.7rem;gap:.35rem}
+.day-grid .warn,.day-grid .err{font-size:.68rem}
+.day-grid button.copy{padding:.12rem .4rem;font-size:.68rem;border-radius:5px}
+.th-foot{display:flex;gap:.5rem;align-items:center;flex-wrap:wrap;margin-top:.5rem;padding-top:.4rem;border-top:1px solid #1c222c}
+.th-foot .edit,.th-foot .th-src,.th-foot .th-meta{font-size:.66rem;max-width:100%;overflow:hidden;text-overflow:ellipsis}
 /* 원고는 통째로 보여야 합니다. 잘라서 스크롤을 만들면 카드 안에서 또 스크롤을 해야 하고,
    그러면 한눈에 훑으려고 격자로 만든 의미가 없어집니다. 길면 그 줄이 길어지는 편이 낫습니다. */
-.day-grid pre.seg-body{font-size:.8rem;line-height:1.65;overflow:visible;max-height:none}
+.day-grid pre.seg-body{font-size:.74rem;line-height:1.6;padding:.55rem .6rem;overflow:visible;max-height:none}
 #thPager{margin-top:.4rem}
 a.th-src{color:#6f7789;font-size:.78rem;text-decoration:none}
 a.th-src:hover{color:#6ee7b7;text-decoration:underline}
@@ -431,9 +444,14 @@ function threadsView(queue, stats, contentDir, batches) {
 
   /* 업무 이야기가 연달아 나가면 계정이 광고판이 됩니다.
      "섞어야지" 라는 다짐은 숫자로 보이지 않으면 지켜지지 않아서, 여기서 세어 보여줍니다. */
-  const runWarn = stats.longestWorkRun >= 4
+  const runWarn = (stats.longestWorkRun >= 4
     ? `<div class="warn">경고: 업무 글이 연속 ${stats.longestWorkRun}편입니다. 사이에 일상 편을 끼우세요.</div>`
-    : "";
+    : "") +
+    /* 편수보다 이쪽이 피로를 만듭니다. 같은 블로그 글에서 나온 편이 줄줄이 이어지면
+       기록이 아니라 연재 광고로 읽히고, 첫 편에 흥미를 느껴 팔로우한 사람이 사흘째에 떠납니다. */
+    (stats.longestTopicRun >= 3
+      ? `<div class="warn">경고: 같은 소재가 연속 ${stats.longestTopicRun}편입니다. 배치를 겹쳐서 흘리세요.</div>`
+      : "");
 
   /* 블로그 글 하나에서 뽑는 배치는 3의 배수여야 합니다. 하루 세 편이 기준이라서요.
      편수는 원고를 다 쓴 뒤에야 확정되므로, 규칙을 말로 적어두는 대신 여기서 세어 알려줍니다. */
