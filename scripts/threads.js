@@ -287,7 +287,8 @@ function scheduleFor(startDate, count) {
   while (out.length < count) {
     const date = day.toISOString().slice(0, 10);
     const size = daySize(date, count - out.length);
-    pick(HOUR_SETS[size]).forEach((h) => out.push(`${date} ${pad(h)}:${pad(Math.floor(Math.random() * 60))}`));
+    // 분은 1~59. 정각을 빼는 이유는 08:00 같은 시각이 예약 발행처럼 보이는 대표적인 모양이라서입니다.
+    pick(HOUR_SETS[size]).forEach((h) => out.push(`${date} ${pad(h)}:${pad(1 + Math.floor(Math.random() * 59))}`));
     day = new Date(day.getTime() + 86400000);
   }
   return out;
