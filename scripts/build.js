@@ -40,7 +40,14 @@ function copyAssets() {
   }
   const dest = path.join(OUT, "assets");
   ensureDir(dest);
-  fs.cpSync(ASSETS, dest, { recursive: true });
+  /* 작업 파일은 배포에 넣지 않습니다.
+     assets/ 는 통째로 복사되는 폴더라, 여기 둔 스크립트나 메모가 그대로 공개 주소로 열립니다.
+     (로고를 만들던 파이썬 스크립트가 실제로 /assets/logo/ 에 올라가 있었습니다) */
+  const SKIP = /\.(py|sh|ps1|bat|md|txt|psd|ai|sketch|fig)$|^\./i;
+  fs.cpSync(ASSETS, dest, {
+    recursive: true,
+    filter: (src) => !SKIP.test(path.basename(src)),
+  });
   return files.length;
 }
 
@@ -227,7 +234,7 @@ ${dims ? `<meta property="og:image:width" content="${dims.w}">
 <title>${esc(fullTitle)}</title>
 <meta name="description" content="${esc(desc)}">
 <link rel="canonical" href="${site.url}${canonical}">
-<meta name="author" content="${esc(site.author)}">
+<meta name="author" content="${esc(authorName(lang))}">
 <meta property="og:type" content="${ogType || "website"}">
 <meta property="og:site_name" content="${esc(site.brand)}">
 <meta property="og:locale" content="${isEn ? "en_US" : "ko_KR"}">
@@ -236,7 +243,7 @@ ${dims ? `<meta property="og:image:width" content="${dims.w}">
 <meta property="og:description" content="${esc(desc)}">
 <meta property="og:url" content="${site.url}${canonical}">
 ${published ? `<meta property="article:published_time" content="${published}">
-<meta property="article:author" content="${esc(site.author)}">
+<meta property="article:author" content="${esc(authorName(lang))}">
 ` : ""}${ogImage}<meta name="twitter:card" content="${ogImage ? "summary_large_image" : "summary"}">
 ${altLinks}<link rel="alternate" type="application/rss+xml" title="${site.brand}" href="/feed.xml">
 <link rel="icon" href="/assets/favicon.svg">
@@ -246,7 +253,7 @@ ${THEME_SCRIPT}
 </head>
 <body>
 <header class="site-header"><div class="wrap">
-  <a class="brand" href="${homeHref}">${LOGO}<span>kadecho.dev</span></a>
+  <a class="brand" href="${homeHref}"><span class="wordmark">kadecho.dev</span></a>
   <nav class="nav">
     <a href="${homeHref}">${t.home}</a>
     <a href="${aboutHref}">${t.nav_about}</a>
@@ -259,7 +266,7 @@ ${THEME_SCRIPT}
 ${body}
 </main>
 <footer class="site-footer"><div class="wrap">
-  <span>© ${String(site.author)} · ${isEn ? "Built with care" : "코드체인"}</span>
+  <span>© ${esc(authorName(lang))} · ${isEn ? "Built with care" : "코드체인"}</span>
   <span class="foot-links">
     <a href="/feed.xml">RSS</a>
   </span>
@@ -305,6 +312,9 @@ function newsletter(lang) {
    글 끝에 "누가 썼는가"를 사람이 볼 수 있게 남깁니다.
    구글 E-E-A-T(경험·전문성·권위·신뢰) 신호이자, 일반적인 글의 형식이기도 합니다.
    같은 정보를 JSON-LD 의 author 로도 내보내 크롤러가 사람과 글을 연결할 수 있게 합니다. */
+/* 이름도 언어별로 다릅니다. 한국어 화면에는 "케이드 조", 영문에는 "Kade".
+   한국어 독자에게 로마자 이름은 남의 이름처럼 읽혀서 사람과 글이 잘 연결되지 않습니다. */
+const authorName = (lang) => (lang === "en" ? site.authorEn : site.authorKo) || site.author || "";
 const authorBio = (lang) => (lang === "en" ? site.authorBioEn : site.authorBioKo) || "";
 
 /* 다른 언어판이 있다는 것을 눈에 보이게 알립니다. 자동 이동을 없앤 자리를 채우는 장치입니다.
@@ -330,7 +340,7 @@ function authorCard(lang) {
   <div class="author-avatar" aria-hidden="true">${LOGO}</div>
   <div class="author-body">
     <p class="author-label">${t.author_label}</p>
-    <p class="author-name">${esc(site.author)}</p>
+    <p class="author-name">${esc(authorName(lang))}</p>
     <p class="author-bio">${esc(authorBio(lang))}</p>
     <p class="author-links">
       <a href="${aboutHref}">${t.author_more}</a>
@@ -346,9 +356,9 @@ const PUBLISHER = {
   url: site.url,
   logo: { "@type": "ImageObject", url: `${site.url}/assets/favicon.svg` },
 };
-const AUTHOR = { "@type": "Person", name: site.author, url: site.url };
+const authorOf = (lang) => ({ "@type": "Person", name: authorName(lang), url: site.url });
 const authorNode = (lang) => ({
-  ...AUTHOR,
+  ...authorOf(lang),
   description: authorBio(lang),
   email: `mailto:${site.email}`,
   sameAs: [site.github],
@@ -419,7 +429,7 @@ ${newsletter(lang)}`;
     url: `${site.url}${canonical}`,
     description: intro,
     inLanguage: isEn ? "en" : "ko",
-    author: AUTHOR,
+    author: authorOf(lang),
     publisher: PUBLISHER,
     blogPost: posts.map((p) => ({
       "@type": "BlogPosting",
@@ -450,7 +460,7 @@ ${newsletter(lang)}`;
     url: `${site.url}${canonical}`,
     inLanguage: isEn ? "en" : "ko",
     mainEntity: {
-      ...AUTHOR,
+      ...authorOf(lang),
       email: `mailto:${site.email}`,
       description: parsed.attributes.description || "",
       sameAs: [site.github],
@@ -468,7 +478,7 @@ function buildPost(lang, post) {
     <p class="article-meta">
       <time datetime="${post.date}">${fmtDate(post.date, lang)}</time>
       <span class="dot" aria-hidden="true">·</span>
-      <a class="byline" href="${isEn ? "/en/about/" : "/about/"}" rel="author">${esc(site.author)}</a>
+      <a class="byline" href="${isEn ? "/en/about/" : "/about/"}" rel="author">${esc(authorName(lang))}</a>
     </p>
     <h1>${esc(post.title)}</h1>
     ${tags ? `<div class="tags" style="margin-top:.8rem">${tags}</div>` : ""}
