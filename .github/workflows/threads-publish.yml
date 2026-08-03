@@ -1,0 +1,51 @@
+name: 쓰레드 발행
+
+# 15분마다 큐를 확인해서, 나갈 시각이 된 편 하나를 올립니다.
+# 깃허브의 예약 실행은 몇 분에서 몇십 분씩 밀립니다. 그래서 발행 스크립트가
+# 예약 시각으로부터 두 시간까지는 늦어도 올리도록 두었습니다.
+# 우리 예약 시각 자체가 08:37 처럼 흩어져 있어서, 몇 분 밀리는 것은 오히려 자연스럽습니다.
+on:
+  schedule:
+    - cron: "*/15 * * * *"
+  workflow_dispatch: # 수동으로도 돌려볼 수 있습니다
+
+# posted 표시를 저장소에 다시 적어야 하므로 쓰기 권한이 필요합니다.
+permissions:
+  contents: write
+
+# 여러 실행이 겹치면 같은 편을 두 번 올릴 수 있습니다.
+concurrency:
+  group: threads-publish
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: 큐 확인 후 발행
+        env:
+          # 저장소 변수 THREADS_LIVE 를 1 로 두어야 실제로 올라갑니다.
+          # 비어 있으면 무엇을 올릴지 로그로만 보여줍니다(드라이런).
+          THREADS_LIVE: ${{ vars.THREADS_LIVE }}
+          THREADS_USER_ID: ${{ secrets.THREADS_USER_ID }}
+          THREADS_ACCESS_TOKEN: ${{ secrets.THREADS_ACCESS_TOKEN }}
+        run: node scripts/threads-publish.js
+
+      - name: 발행 표시 커밋
+        run: |
+          if [ -z "$(git status --porcelain content/threads)" ]; then
+            echo "바뀐 것이 없습니다."
+            exit 0
+          fi
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add content/threads
+          git commit -m "쓰레드 발행 표시 [skip ci]"
+          # 사람이 그사이 커밋했을 수 있으므로 한 번 당겨서 얹습니다.
+          git pull --rebase origin main
+          git push origin HEAD:main

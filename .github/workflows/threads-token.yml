@@ -1,0 +1,43 @@
+name: 쓰레드 토큰 갱신
+
+# 쓰레드 액세스 토큰은 60일이면 만료됩니다.
+# 만료되면 발행이 조용히 멈추고, 며칠 뒤에야 알게 됩니다. 그래서 자동으로 늘립니다.
+#
+# 주마다 도는 이유는 여유를 두기 위해서입니다. 한 번 실패해도 다음 주에 다시 시도하면 되고,
+# 60일 안에 여덟 번의 기회가 생깁니다. 한 달에 한 번이면 두 번 놓치는 순간 끝납니다.
+#
+# 필요한 시크릿
+#   THREADS_ACCESS_TOKEN  지금 쓰는 60일 토큰
+#   SECRETS_PAT           시크릿을 바꿀 수 있는 개인 액세스 토큰
+#                         (Fine-grained PAT, 이 저장소에 Secrets 쓰기 권한)
+#                         기본 GITHUB_TOKEN 으로는 시크릿을 못 바꿉니다.
+on:
+  schedule:
+    - cron: "0 18 * * 0" # 매주 월요일 새벽 3시(한국 시각)
+  workflow_dispatch:
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: 토큰 늘리기
+        id: refresh
+        env:
+          THREADS_ACCESS_TOKEN: ${{ secrets.THREADS_ACCESS_TOKEN }}
+        run: |
+          OUT=$(node scripts/threads-token.js refresh)
+          echo "$OUT" | grep -q '^TOKEN=' || { echo "토큰을 받지 못했습니다"; exit 1; }
+          echo "${OUT#TOKEN=}" > token.txt
+
+      - name: 시크릿에 새 토큰 넣기
+        env:
+          GH_TOKEN: ${{ secrets.SECRETS_PAT }}
+        run: |
+          gh secret set THREADS_ACCESS_TOKEN --body "$(cat token.txt)"
+          rm -f token.txt
+          echo "새 토큰을 저장했습니다."

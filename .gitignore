@@ -18,3 +18,6 @@ Thumbs.db
 .vscode/*
 !.vscode/settings.json
 .idea/
+
+# 쓰레드 앱 정보. 토큰과 시크릿이 들어가므로 절대 커밋하지 않습니다.
+.env.threads

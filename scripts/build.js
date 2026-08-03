@@ -193,7 +193,7 @@ function jsonLdTag(obj) {
   return `<script type="application/ld+json">${json}</script>\n`;
 }
 
-function layout({ lang, title, description, canonical, langAltHref, active, body, autoLang, noAlt, ogType, published, jsonLd, card }) {
+function layout({ lang, title, description, canonical, langAltHref, active, body, autoLang, noAlt, noIndex, ogType, published, jsonLd, card }) {
   const t = T[lang];
   const isEn = lang === "en";
   // hreflang: 검색엔진에 "같은 글의 다른 언어판"을 알려 각 언어권에 맞는 페이지가 노출되게 함
@@ -239,6 +239,8 @@ ${dims ? `<meta property="og:image:width" content="${dims.w}">
 <title>${esc(fullTitle)}</title>
 <meta name="description" content="${esc(desc)}">
 <link rel="canonical" href="${site.url}${canonical}">
+${noIndex ? `<meta name="robots" content="noindex, nofollow">
+` : ""}
 <meta name="author" content="${esc(authorName(lang))}">
 <meta property="og:type" content="${ogType || "website"}">
 <meta property="og:site_name" content="${esc(site.brand)}">
@@ -575,6 +577,39 @@ write("feed.xml", buildFeed(koPosts));
 write("sitemap.xml", buildSitemap(urls));
 // assets/favicon.svg 를 직접 두면 그걸 쓰고, 없으면 기본 파비콘을 생성.
 if (!fs.existsSync(path.join(ASSETS, "favicon.svg"))) write("assets/favicon.svg", FAVICON);
+/* 쓰레드 앱의 리다이렉트 주소.
+   Meta 는 실제로 열리지 않는 주소를 앱 설정에 등록하지 못하게 막습니다. 그래서 빈 페이지라도 있어야 합니다.
+   겸사겸사 주소창에 붙는 code 를 화면에 크게 띄워 줍니다. 손으로 주소창에서 잘라내는 것보다 덜 틀립니다.
+   토큰이나 비밀값은 이 페이지를 지나가지 않습니다. code 는 몇 분이면 만료되는 일회용입니다. */
+write("threads-callback/index.html", layout({
+  lang: "ko",
+  title: "쓰레드 연결",
+  description: "쓰레드 앱 인증 코드를 받는 자리입니다.",
+  canonical: "/threads-callback/",
+  langAltHref: "/",
+  active: "",
+  noAlt: true,
+  noIndex: true, // 검색에 잡힐 이유가 없는 도구 페이지입니다
+  body: `<section class="hero">
+  <h1>쓰레드 연결</h1>
+  <p id="msg">주소에 코드가 없습니다. 이 페이지는 쓰레드 앱 인증에만 씁니다.</p>
+  <pre id="code" style="display:none;white-space:pre-wrap;word-break:break-all;background:var(--card);border:1px solid var(--border);border-radius:12px;padding:16px 18px;font-size:.95rem"></pre>
+  <p id="next" style="display:none;color:var(--muted)">이 값을 복사해서 아래를 실행하세요.<br><code>npm run thread:token code &lt;붙여넣기&gt;</code><br>코드는 몇 분이면 만료됩니다.</p>
+</section>
+<script>
+(function(){
+  var code = new URLSearchParams(location.search).get('code');
+  if (!code) return;
+  code = code.replace(/#_$/, '');
+  document.getElementById('msg').textContent = '아래 코드를 복사하세요.';
+  var box = document.getElementById('code');
+  box.textContent = code;
+  box.style.display = 'block';
+  document.getElementById('next').style.display = 'block';
+})();
+</script>`,
+}));
+
 write("404.html", layout({ lang: "ko", title: "404", description: "페이지를 찾을 수 없습니다.", canonical: "/404.html", langAltHref: "/en/", active: "", noAlt: true, body: `<section class="hero"><h1>404</h1><p>이 링크는 아직 사슬에 없네요.</p><div class="cta"><a class="btn btn-primary" href="/">홈으로</a></div></section>` }));
 write(".nojekyll", "");
 // 커스텀 도메인은 site.json의 customDomain이 채워졌을 때만 생성.

@@ -3,6 +3,11 @@ name: Build & Deploy blog
 on:
   push:
     branches: [main]
+    # 쓰레드 원고는 사이트 산출물에 들어가지 않습니다.
+    # 발행 자동화가 posted 표시를 커밋할 때마다 사이트를 다시 배포할 이유가 없습니다.
+    paths-ignore:
+      - "content/threads/**"
+      - "design/**"
   workflow_dispatch: # 수동 실행도 가능
 
 permissions:

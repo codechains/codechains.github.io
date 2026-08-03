@@ -84,10 +84,12 @@ function nextId(id) {
    날짜만, 시각만, 성격만 적어도 됩니다. 못 알아본 토큰은 조용히 버리지 않고 그대로 돌려주어
    오타(예: redy)가 화면에서 눈에 띄게 합니다. */
 function parseMeta(line) {
-  const out = { id: "", date: "", time: "", kind: "", status: "", unknown: [] };
+  const out = { id: "", date: "", time: "", kind: "", status: "", postedAt: "", unknown: [] };
   String(line).trim().split(/\s+/).filter(Boolean).forEach((tok) => {
     if (/^\d{4}-\d{2}-\d{2}$/.test(tok)) out.date = tok;
     else if (ID_RE.test(tok)) out.id = tok;
+    // @2026-08-03T09:02 는 실제로 올라간 시각입니다. 발행 자동화가 남깁니다.
+    else if (/^@/.test(tok)) out.postedAt = tok.slice(1);
     else if (/^\d{1,2}:\d{2}$/.test(tok)) out.time = tok.padStart(5, "0");
     else if (Object.prototype.hasOwnProperty.call(KIND, tok)) out.kind = tok;
     else if (Object.prototype.hasOwnProperty.call(STATUS, tok)) out.status = tok;
@@ -131,6 +133,7 @@ function parseBatch(file, raw) {
       sortKey: meta.date ? Number(new Date(`${meta.date}T${meta.time || "23:59"}:00+09:00`)) : Infinity,
       kind: meta.kind || baseKind,
       status: meta.status || "draft",
+      postedAt: meta.postedAt,
       unknown: meta.unknown,
       parts,
       len: parts.reduce((m, p) => Math.max(m, p.len), 0),
@@ -412,6 +415,52 @@ function writeIds(dir) {
   return added;
 }
 
+/* 발행한 편에 표시를 남깁니다. 고유번호로 찾아 상태만 바꿉니다.
+   발행 자동화가 성공한 직후에 부릅니다. 이게 안 되면 다음 실행이 같은 편을 또 올립니다.
+   그래서 찾지 못하면 조용히 넘어가지 않고 예외를 던집니다. */
+function markPosted(dir, id, when) {
+  const files = fs.readdirSync(dir).filter((f) => f.endsWith(".md") && !f.startsWith("_"));
+  for (const f of files) {
+    const p = path.join(dir, f);
+    const src = fs.readFileSync(p, "utf8");
+    let hit = false;
+    const out = src.replace(/^=== .*$/gm, (line) => {
+      const m = parseMeta(line.replace(/^=== */, ""));
+      if (m.id !== id || hit) return line;
+      hit = true;
+      const parts = [m.date, m.id, m.time, m.kind, "posted", ...m.unknown].filter(Boolean);
+      // 올린 시각을 뒤에 남깁니다. 예약 시각과 실제 시각이 얼마나 벌어졌는지 나중에 볼 수 있게.
+      return `=== ${parts.join(" ")}${when ? ` @${when}` : ""}`;
+    });
+    if (hit) {
+      fs.writeFileSync(p, out);
+      return f;
+    }
+  }
+  throw new Error(`${id} 를 찾지 못했습니다. 표시를 못 남기면 다음 실행이 같은 편을 또 올립니다.`);
+}
+
+/* 아직 안 올린 편들의 날짜를 통째로 미룹니다.
+   큐를 짜둔 뒤 며칠 미루는 일은 늘 생깁니다. 그때 마흔 줄을 손으로 고치면 실수가 납니다.
+   이미 posted 인 편은 건드리지 않습니다. 지나간 기록이라서요. */
+function shiftDays(dir, days) {
+  const files = fs.readdirSync(dir).filter((f) => f.endsWith(".md") && !f.startsWith("_"));
+  let moved = 0;
+  files.forEach((f) => {
+    const p = path.join(dir, f);
+    const out = fs.readFileSync(p, "utf8").replace(/^=== .*$/gm, (line) => {
+      const m = parseMeta(line.replace(/^=== */, ""));
+      if (!m.date || m.status === "posted") return line;
+      const d = new Date(`${m.date}T00:00:00Z`);
+      d.setUTCDate(d.getUTCDate() + days);
+      moved += 1;
+      return `=== ${[d.toISOString().slice(0, 10), m.id, m.time, m.kind, m.status, ...m.unknown].filter(Boolean).join(" ")}`;
+    });
+    fs.writeFileSync(p, out);
+  });
+  return moved;
+}
+
 /* ---------- CLI ---------- */
 function cli(argv) {
   const { loadPosts } = require("./posts");
@@ -422,6 +471,15 @@ function cli(argv) {
   if (argv.includes("--ids")) {
     const added = writeIds(THREADS);
     console.log(added ? `고유번호 ${added}개를 붙였습니다.` : "번호가 빠진 편이 없습니다.");
+    return;
+  }
+
+  const shift = argv.find((a) => /^--shift=-?\d+$/.test(a));
+  if (shift) {
+    const days = Number(shift.split("=")[1]);
+    const moved = shiftDays(THREADS, days);
+    console.log(`아직 안 올린 ${moved}편을 ${days > 0 ? `${days}일 뒤로` : `${-days}일 앞으로`} 옮겼습니다.`);
+    console.log("발행한 편은 건드리지 않았습니다.");
     return;
   }
 
@@ -485,4 +543,4 @@ function cli(argv) {
 
 if (require.main === module) cli(process.argv.slice(2));
 
-module.exports = { LIMIT, SOFT, PER_DAY, STATUS, KIND, loadThreads, queueOf, queueStats, checkPost, batchIssues, countChars, seedFrom, scheduleFor, nextId, fillIds, writeIds };
+module.exports = { LIMIT, SOFT, PER_DAY, STATUS, KIND, loadThreads, queueOf, queueStats, checkPost, batchIssues, countChars, seedFrom, scheduleFor, nextId, fillIds, writeIds, markPosted };

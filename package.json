@@ -8,7 +8,9 @@
     "dev": "node scripts/serve.js",
     "og": "node scripts/make-og.js",
     "wordmark": "node scripts/make-wordmark.js",
-    "thread": "node scripts/threads.js"
+    "thread": "node scripts/threads.js",
+    "thread:token": "node scripts/threads-token.js",
+    "thread:publish": "node scripts/threads-publish.js"
   },
   "keywords": [],
   "author": "",
