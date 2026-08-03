@@ -21,7 +21,7 @@ First, **writing preserves the learning.** An experiment that only happens in yo
 
 Second, **the open makes me honest.** Knowing someone might read it is what keeps me from hand-waving and pushes me to actually understand.
 
-Third, and most important, **connection.** There are people out there wrestling with the same questions. If others on the same path find this record and link up, this journey goes much further. That's exactly why this blog is called *codechains*. **Single links, joined, become a chain.**
+Third, and most important, **connection.** There are people out there wrestling with the same questions. If others on the same path find this record and link up, this journey goes much further. **A link on its own is just a link. Joined, they become a chain.**
 
 ## What will pile up here
 
