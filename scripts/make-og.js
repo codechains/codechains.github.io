@@ -30,9 +30,17 @@ const ASSETS = path.join(ROOT, "assets");
 const CACHE = path.join(__dirname, ".og-cache.json");
 const site = JSON.parse(fs.readFileSync(path.join(CONTENT, "site.json"), "utf8"));
 
+/* 2:1 로 만듭니다.
+   1200x630(1.91:1)은 페이스북이 정한 Open Graph 표준값인데, 우리가 실제로 쓰는 곳은
+   쓰레드와 카카오톡이고 둘 다 2:1 을 기준으로 링크 카드를 그립니다. X 도 2:1 입니다.
+   페이스북·링크드인에서 생기는 2.4% 차이는 눈에 띄지 않습니다.
+
+   위아래 20px 은 비워 둡니다. 플랫폼마다 자르는 폭이 조금씩 달라서,
+   그 바깥에 글자를 두면 어디선가는 잘립니다. 지금 여백(위 68, 아래 76)이면 넉넉합니다. */
 const WIDTH = 1200;
-const HEIGHT = 630;
+const HEIGHT = 600;
 const SCALE = 2; // 고해상도 화면에서도 글자가 또렷하도록 2배로 캡처
+const KAKAO_LIMIT_KB = 500; // 카카오톡이 받아주는 og:image 용량 한도
 const FORCE = process.argv.includes("--force");
 
 const esc = (s) =>
@@ -109,8 +117,7 @@ const STYLE = `
   }
   .top { position: relative; display: flex; align-items: center; justify-content: space-between; }
   .row { display: flex; align-items: center; gap: 16px; }
-  /* 워드마크. 폭이 높이의 네 배라 높이만 정하고 폭은 따라오게 둡니다. */
-  .row svg { height: 54px; width: auto; display: block; }
+  .brand { font-size: 32px; font-weight: 700; letter-spacing: -.01em; }
   .date { font-size: 25px; color: #8b93a7; font-variant-numeric: tabular-nums; }
   .middle { position: relative; flex: 1; display: flex; align-items: center; min-height: 0; padding: 26px 0; }
   h1 { font-size: 78px; line-height: 1.24; font-weight: 800; letter-spacing: -.035em; word-break: keep-all; }
@@ -138,7 +145,7 @@ function cardHtml({ lang, heading, date, sub, fit }) {
 <div class="card">
   <div class="glow"></div>
   <div class="top">
-    <div class="row">${WORDMARK}</div>
+    <div class="row"><span class="brand">${esc(site.brand)}</span></div>
     ${date ? `<span class="date">${esc(date)}</span>` : ""}
   </div>
   <div class="middle"><h1${fit ? ` id="fit"` : ""}>${heading}</h1></div>
@@ -252,9 +259,16 @@ jobs.forEach((job) => {
   if (size.w !== WIDTH * SCALE || size.h !== HEIGHT * SCALE) {
     console.warn(`  경고: ${job.label} 크기가 ${size.w}x${size.h} 입니다(기대 ${WIDTH * SCALE}x${HEIGHT * SCALE}).`);
   }
+  /* 카카오톡은 500KB 를 넘는 og:image 를 아예 안 보여줍니다.
+     한국 독자가 단톡방에 링크를 던지는 경로라 미리보기가 빠지면 손해가 큽니다.
+     제목이 길어지면 용량이 늘어나므로 만들 때마다 확인합니다. */
+  const KB = size.bytes / 1024;
+  if (KB > KAKAO_LIMIT_KB) {
+    console.warn(`  경고: ${job.label} 이 ${KB.toFixed(0)}KB 입니다. 카카오톡은 ${KAKAO_LIMIT_KB}KB 를 넘으면 미리보기를 안 띄웁니다.`);
+  }
   cache[key] = h;
   made++;
-  console.log(`  만듦: ${job.label}  ${(size.bytes / 1024).toFixed(0)}KB`);
+  console.log(`  만듦: ${job.label}  ${KB.toFixed(0)}KB${KB > KAKAO_LIMIT_KB * 0.8 ? " (카카오 한도에 근접)" : ""}`);
 });
 
 /* 글을 지웠거나 슬러그를 바꾸면 예전 카드가 남습니다.
