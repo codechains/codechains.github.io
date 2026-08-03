@@ -59,13 +59,35 @@ const countChars = (s) => [...String(s)].length;
 
 const hasLink = (s) => /https?:\/\//.test(s);
 
+/* ---------- 편 고유번호 ----------
+   알파벳 두 자 + 숫자 두 자. AA01 부터 시작해 AA99 다음이 AB01, AZ99 다음이 BA01 입니다.
+   26 x 26 x 99 = 66,924 편까지 갑니다.
+
+   한 번 붙은 번호는 절대 바뀌지 않습니다. 날짜를 다시 배정하든 순서를 섞든 그대로입니다.
+   그래야 "AA07 그 글 말이야" 라고 부를 수 있고, 나중에 발행 결과나 반응을 이 번호로 이어 붙일 수 있습니다.
+   자리 수가 고정이라 문자열 비교만으로 순서가 나옵니다(AA01 < AA02 < AB01). */
+const ID_RE = /^[A-Z]{2}\d{2}$/;
+const FIRST_ID = "AA01";
+
+function nextId(id) {
+  if (!id) return FIRST_ID;
+  let a = id.charCodeAt(0);
+  let b = id.charCodeAt(1);
+  let n = Number(id.slice(2)) + 1;
+  if (n > 99) { n = 1; b += 1; }
+  if (b > 90) { b = 65; a += 1; } // 'Z' = 90, 'A' = 65
+  if (a > 90) return null; // 다 썼습니다. 66,924 편이라 실제로는 오지 않습니다.
+  return String.fromCharCode(a) + String.fromCharCode(b) + String(n).padStart(2, "0");
+}
+
 /* === 뒤에 붙는 토큰들. 순서를 외우지 않아도 되도록 종류로 알아봅니다.
    날짜만, 시각만, 성격만 적어도 됩니다. 못 알아본 토큰은 조용히 버리지 않고 그대로 돌려주어
    오타(예: redy)가 화면에서 눈에 띄게 합니다. */
 function parseMeta(line) {
-  const out = { date: "", time: "", kind: "", status: "", unknown: [] };
+  const out = { id: "", date: "", time: "", kind: "", status: "", unknown: [] };
   String(line).trim().split(/\s+/).filter(Boolean).forEach((tok) => {
     if (/^\d{4}-\d{2}-\d{2}$/.test(tok)) out.date = tok;
+    else if (ID_RE.test(tok)) out.id = tok;
     else if (/^\d{1,2}:\d{2}$/.test(tok)) out.time = tok.padStart(5, "0");
     else if (Object.prototype.hasOwnProperty.call(KIND, tok)) out.kind = tok;
     else if (Object.prototype.hasOwnProperty.call(STATUS, tok)) out.status = tok;
@@ -101,6 +123,7 @@ function parseBatch(file, raw) {
     const parts = splitReplies(chunks[i + 1] || "");
     posts.push({
       n: posts.length + 1,
+      id: meta.id,
       date: meta.date,
       time: meta.time,
       at: meta.date ? `${meta.date}${meta.time ? ` ${meta.time}` : " 00:00"}` : "",
@@ -158,7 +181,8 @@ function checkPost(p, postsBySlug) {
     add("warn", "링크가 첫 편에 있습니다. 링크가 붙은 글은 덜 퍼지므로 답글로 내리세요.");
   }
 
-  if (!p.date) add("warn", "나갈 날짜가 없습니다. === 뒤에 2026-08-04 08:20 처럼 적어두세요.");
+  if (!p.id) add("warn", "고유번호가 없습니다. npm run thread -- --ids 로 채우세요.");
+  if (!p.date) add("warn", "나갈 날짜가 없습니다. === 뒤에 2026-08-04 08:37 처럼 적어두세요.");
   if (p.unknown.length) add("warn", `=== 줄에서 못 알아본 말: ${p.unknown.join(", ")}. 오타인지 보세요.`);
   if (p.source && postsBySlug && !postsBySlug.has(p.source)) {
     add("error", `source: ${p.source} 에 해당하는 블로그 글이 없습니다.`);
@@ -171,13 +195,38 @@ function checkPost(p, postsBySlug) {
    소재가 없는 파일(일상 편 등)은 쌓아가는 성격이라 이 규칙에서 뺍니다. */
 const PER_DAY = 3;
 function batchIssues(batches) {
-  return batches
+  const out = batches
     .filter((b) => b.source && b.posts.length % PER_DAY !== 0)
     .map((b) => {
       const short = PER_DAY - (b.posts.length % PER_DAY);
       const down = b.posts.length - (b.posts.length % PER_DAY);
       return `${b.file}: ${b.posts.length}편입니다. ${b.posts.length + short}편으로 늘리거나 ${down}편으로 줄이세요(3의 배수).`;
     });
+
+  /* 고유번호가 겹치면 번호로 글을 가리키는 일이 전부 어긋납니다.
+     손으로 복사해서 편을 늘릴 때 실제로 생기는 실수라 여기서 잡습니다. */
+  const seen = new Map();
+  batches.forEach((b) => b.posts.forEach((p) => {
+    if (!p.id) return;
+    if (seen.has(p.id)) out.push(`고유번호 ${p.id} 가 ${seen.get(p.id)} 와 ${b.file} 에서 겹칩니다.`);
+    else seen.set(p.id, b.file);
+  }));
+  return out;
+}
+
+/* 번호가 없는 편에만 번호를 붙입니다. 이미 붙은 번호는 건드리지 않습니다.
+   붙는 순서는 나갈 순서(큐 순서)입니다. AA01 이 가장 먼저 나가는 편이 되도록. */
+function fillIds(batches) {
+  const used = batches.flatMap((b) => b.posts.map((p) => p.id)).filter(Boolean).sort();
+  let last = used.length ? used[used.length - 1] : "";
+  const assigned = new Map();
+  queueOf(batches).forEach((p) => {
+    if (p.id) return;
+    last = nextId(last);
+    if (!last) throw new Error("고유번호를 다 썼습니다(ZZ99).");
+    assigned.set(`${p.file}#${p.n}`, last);
+  });
+  return assigned;
 }
 
 /* 큐 배합. 업무 이야기만 줄줄이 이어지면 알려줍니다.
@@ -310,9 +359,10 @@ function scheduleFor(startDate, count) {
   return out;
 }
 
-function seedFrom(post, startDate) {
+function seedFrom(post, startDate, afterId) {
   const hooks = hookCandidates(post);
   const heads = outline(post);
+  let id = afterId || "";
   // 소제목 수에서 출발하되 3의 배수로 맞춥니다(3, 6, 9). 하루 세 편이 기준이라 딱 떨어져야 합니다.
   const count = Math.min(Math.max(Math.round(heads.length / PER_DAY) * PER_DAY, PER_DAY), PER_DAY * 3);
   const when = scheduleFor(startDate, count);
@@ -322,7 +372,9 @@ function seedFrom(post, startDate) {
       const angle = heads[i] ? `소재: ${heads[i]}` : "소재: 글에서 하나 더 고르세요";
       const hook = hooks[i] ? `\n     첫 줄 후보: ${hooks[i]}` : "";
       const tail = i === count - 1 ? "\n     마지막 편에서만 블로그 링크를 겁니다." : "";
-      return `=== ${at} work\n<!-- ${angle}${hook}${tail} -->\n(여기에 한 편)\n`;
+      const [d, t] = at.split(" ");
+      id = nextId(id);
+      return `=== ${d} ${id} ${t} work\n<!-- ${angle}${hook}${tail} -->\n(여기에 한 편)\n`;
     })
     .join("\n");
 
@@ -338,12 +390,40 @@ kind: work
 ${body}`;
 }
 
+/* 번호가 없는 편에 번호를 써 넣고, === 줄을 표준 형태로 정리합니다.
+   표준 형태:  === 날짜 번호 시각 성격 상태
+   (파서는 순서를 가리지 않지만, 파일을 눈으로 볼 때 자리가 고정돼 있어야 읽힙니다) */
+function writeIds(dir) {
+  const batches = loadThreads(dir);
+  const assigned = fillIds(batches);
+  let added = 0;
+  batches.forEach((b) => {
+    const file = path.join(dir, b.file);
+    let seen = 0;
+    const out = fs.readFileSync(file, "utf8").replace(/^=== .*$/gm, (line) => {
+      seen += 1;
+      const m = parseMeta(line.replace(/^=== */, ""));
+      const id = m.id || assigned.get(`${b.file}#${seen}`) || "";
+      if (!m.id && id) added += 1;
+      return `=== ${[m.date, id, m.time, m.kind, m.status, ...m.unknown].filter(Boolean).join(" ")}`;
+    });
+    fs.writeFileSync(file, out);
+  });
+  return added;
+}
+
 /* ---------- CLI ---------- */
 function cli(argv) {
   const { loadPosts } = require("./posts");
   const ROOT = path.join(__dirname, "..");
   const CONTENT = path.join(ROOT, "content");
   const THREADS = path.join(CONTENT, "threads");
+
+  if (argv.includes("--ids")) {
+    const added = writeIds(THREADS);
+    console.log(added ? `고유번호 ${added}개를 붙였습니다.` : "번호가 빠진 편이 없습니다.");
+    return;
+  }
 
   const posts = loadPosts(path.join(CONTENT, "posts-kr"));
   const batches = loadThreads(THREADS);
@@ -393,7 +473,9 @@ function cli(argv) {
       return;
     }
     fs.mkdirSync(THREADS, { recursive: true });
-    fs.writeFileSync(out, seedFrom(post, start), "utf8");
+    // 이미 쓰인 번호 다음부터 이어 붙입니다
+    const used = loadThreads(THREADS).flatMap((b) => b.posts.map((p) => p.id)).filter(Boolean).sort();
+    fs.writeFileSync(out, seedFrom(post, start, used[used.length - 1] || ""), "utf8");
     console.log(`만들었습니다: ${path.relative(ROOT, out)} (${start} 부터)`);
   });
 
@@ -403,4 +485,4 @@ function cli(argv) {
 
 if (require.main === module) cli(process.argv.slice(2));
 
-module.exports = { LIMIT, SOFT, PER_DAY, STATUS, KIND, loadThreads, queueOf, queueStats, checkPost, batchIssues, countChars, seedFrom, scheduleFor };
+module.exports = { LIMIT, SOFT, PER_DAY, STATUS, KIND, loadThreads, queueOf, queueStats, checkPost, batchIssues, countChars, seedFrom, scheduleFor, nextId, fillIds, writeIds };

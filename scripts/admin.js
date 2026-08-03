@@ -114,6 +114,10 @@ pre.seg-body{margin:0;padding:.7rem .75rem;white-space:pre-wrap;word-break:break
 .b-work{background:#1a2233;color:#9db4e8}
 .b-life{background:#2a1f30;color:#d8a9e8}
 .when{font-variant-numeric:tabular-nums;color:#a7b0c2;font-size:.82rem;white-space:nowrap}
+/* 편 고유번호. 한 번 붙으면 바뀌지 않는 이름이라 다른 것보다 먼저 옵니다.
+   고정폭 글꼴로 두어 카드가 세로로 늘어섰을 때 번호 자리가 눈으로 맞습니다. */
+.pid{font-family:ui-monospace,SFMono-Regular,Consolas,monospace;font-size:.76rem;font-weight:600;
+     color:#6ee7b7;background:#12251d;border-radius:4px;padding:.05rem .3rem;white-space:nowrap}
 
 /* 하루가 한 줄, 한 줄에 카드 넉 장 */
 section.day{margin-bottom:1.4rem}
@@ -416,6 +420,7 @@ function postCard(p) {
      날짜는 줄 머리에 한 번만 나오고, 파일 경로처럼 폭을 잡아먹는 것은 아래로 내립니다. */
   return `<article class="th">
     <div class="th-head">
+      <span class="pid">${esc(p.id || "----")}</span>
       <span class="when">${esc(p.time || "시각 미정")}</span>
       <span class="badge ${kcls}">${klabel}</span>
       <span class="badge ${scls}">${slabel}</span>
