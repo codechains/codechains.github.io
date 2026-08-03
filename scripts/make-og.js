@@ -55,12 +55,19 @@ function findChrome() {
   return candidates.find((p) => fs.existsSync(p)) || null;
 }
 
-const LOGO = `<svg viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
-<path d="M12.5 19.5l7-7" stroke="url(#g)" stroke-width="2.4" stroke-linecap="round"/>
-<path d="M14.8 9.2l1.7-1.7a4.6 4.6 0 016.5 6.5l-1.7 1.7" stroke="url(#g)" stroke-width="2.4" stroke-linecap="round"/>
-<path d="M17.2 22.8l-1.7 1.7a4.6 4.6 0 01-6.5-6.5l1.7-1.7" stroke="url(#g)" stroke-width="2.4" stroke-linecap="round"/>
-<defs><linearGradient id="g" x1="6" y1="8" x2="26" y2="24" gradientUnits="userSpaceOnUse">
-<stop stop-color="#6ee7b7"/><stop offset="1" stop-color="#7aa2ff"/></linearGradient></defs></svg>`;
+/* 카드 위쪽에 들어가는 워드마크.
+   헤더가 쓰는 것과 같은 파일을 그대로 읽어 옵니다. 로고를 다시 만들면(npm run wordmark)
+   카드도 같이 따라오도록, 여기에 모양을 베껴 두지 않습니다.
+   카드 배경이 어두우므로 어두운 테마용을 씁니다.
+
+   크기는 CSS 로 정하므로 루트 svg 의 width/height 만 뗍니다.
+   파일 전체에서 떼면 안 됩니다. 안쪽 마스크의 rect 크기까지 사라져서
+   마스크가 통째로 검게 되고 로고가 아예 안 보입니다. 실제로 한 번 그렇게 나갔습니다. */
+const WORDMARK = fs
+  .readFileSync(path.join(ROOT, "assets/logo/wordmark-nowing-dark.svg"), "utf8")
+  .replace(/^<\?xml[^>]*\?>\s*/, "")
+  .replace(/<svg\b[^>]*>/, (tag) => tag.replace(/\s+(width|height)="[^"]*"/g, ""));
+
 
 /* 제목 길이는 글마다 다릅니다. 넘치면 카드 밖으로 잘려 나가므로,
    캡처 직전에 제목이 자리에 들어갈 때까지 글자 크기를 줄입니다.
@@ -100,13 +107,10 @@ const STYLE = `
       radial-gradient(760px 420px at 8% -6%, rgba(110,231,183,.16), transparent 60%),
       radial-gradient(700px 460px at 100% 108%, rgba(122,162,255,.18), transparent 62%);
   }
-  /* 오른쪽 아래 큰 로고. 브랜드를 각인시키되 글자를 방해하지 않을 만큼만. */
-  .mark { position: absolute; right: -70px; bottom: -110px; width: 460px; height: 460px; opacity: .07; }
-  .mark svg { width: 100%; height: 100%; }
   .top { position: relative; display: flex; align-items: center; justify-content: space-between; }
   .row { display: flex; align-items: center; gap: 16px; }
-  .row svg { width: 44px; height: 44px; }
-  .wordmark { font-size: 32px; font-weight: 700; letter-spacing: -.01em; }
+  /* 워드마크. 폭이 높이의 네 배라 높이만 정하고 폭은 따라오게 둡니다. */
+  .row svg { height: 54px; width: auto; display: block; }
   .date { font-size: 25px; color: #8b93a7; font-variant-numeric: tabular-nums; }
   .middle { position: relative; flex: 1; display: flex; align-items: center; min-height: 0; padding: 26px 0; }
   h1 { font-size: 78px; line-height: 1.24; font-weight: 800; letter-spacing: -.035em; word-break: keep-all; }
@@ -133,15 +137,13 @@ function cardHtml({ lang, heading, date, sub, fit }) {
 <body>
 <div class="card">
   <div class="glow"></div>
-  <div class="mark">${LOGO}</div>
   <div class="top">
-    <div class="row">${LOGO}<span class="wordmark">${esc(site.brand)}</span></div>
+    <div class="row">${WORDMARK}</div>
     ${date ? `<span class="date">${esc(date)}</span>` : ""}
   </div>
   <div class="middle"><h1${fit ? ` id="fit"` : ""}>${heading}</h1></div>
   <footer>
     <span class="sub">${esc(sub)}</span>
-    <span class="url">${esc(site.customDomain || "kadecho.dev")}</span>
   </footer>
   <div class="bar"></div>
 </div>
