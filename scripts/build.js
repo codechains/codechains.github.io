@@ -266,7 +266,7 @@ ${THEME_SCRIPT}
 ${body}
 </main>
 <footer class="site-footer"><div class="wrap">
-  <span>© ${esc(authorName(lang))} · ${isEn ? "Built with care" : "코드체인"}</span>
+  <span>© ${esc(authorName(lang))} · ${esc(site.brand)}</span>
   <span class="foot-links">
     <a href="/feed.xml">RSS</a>
   </span>

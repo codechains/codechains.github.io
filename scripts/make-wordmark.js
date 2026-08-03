@@ -99,5 +99,54 @@ Object.entries(THEMES).forEach(([name, t]) => {
   });
 });
 
-console.log(`\n${made}개 만들었습니다. 배경은 비칩니다(마스크로 뚫음).`);
+/* ---------- 파비콘 ----------
+   워드마크의 첫 글자 k 하나만 씁니다. 32px 짜리 정사각형에 워드마크 전체를 넣으면
+   글자가 뭉개져서 아무것도 안 보입니다.
+
+   어두운 둥근 사각형을 깔고 그 위에 글자를 올립니다. 파비콘은 브라우저 탭이나
+   즐겨찾기 목록처럼 밝기가 제각각인 자리에 놓이므로, 배경을 깔아야 어디서든 같게 보입니다.
+   그래서 여기서는 마스크로 뚫지 않고 배경 위에 그립니다.
+
+   k 는 원본에서 x 190~338 에 있지만 왼쪽 일부는 가리개에 덮입니다.
+   덮이는 부분까지 넣고 자리를 잡으면 글자가 한쪽으로 쏠리므로, 마스크를 적용한 뒤의
+   실제 폭을 기준으로 가운데를 맞춥니다. */
+const FAV = { size: 32, pad: 2.5, radius: 7, bg: "#0e1116" };
+const K = { x0: 232, x1: 338, y0: 265, y1: 511 }; // 가리개 적용 후 k 가 차지하는 자리(viewBox 좌표)
+
+function favicon() {
+  const t = THEMES.dark;
+  const inner = FAV.size - FAV.pad * 2;
+  const w = K.x1 - K.x0;
+  const h = K.y1 - K.y0;
+  const s = Math.min(inner / w, inner / h);
+  const tx = (FAV.size - w * s) / 2 - K.x0 * s;
+  const ty = (FAV.size - h * s) / 2 - K.y0 * s;
+  const r4 = (n) => Math.round(n * 10000) / 10000;
+
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${FAV.size} ${FAV.size}" width="${FAV.size}" height="${FAV.size}" role="img" aria-label="kadecho.dev">
+<title>kadecho.dev</title>
+<defs>
+<linearGradient id="w" x1="${K.x0}" y1="0" x2="${K.x1}" y2="0" gradientUnits="userSpaceOnUse">
+<stop offset="0" stop-color="${t.accent}"/><stop offset="1" stop-color="${t.accent2}"/>
+</linearGradient>
+<mask id="cut" maskUnits="userSpaceOnUse" x="${K.x0}" y="${K.y0}" width="${w}" height="${h}">
+<rect x="${K.x0}" y="${K.y0}" width="${w}" height="${h}" fill="#fff"/>
+<g transform="${FLIP}"><path d="${covers[0]}" fill="#000"/></g>
+</mask>
+</defs>
+<rect width="${FAV.size}" height="${FAV.size}" rx="${FAV.radius}" fill="${FAV.bg}"/>
+<g transform="translate(${r4(tx)},${r4(ty)}) scale(${r4(s)})">
+<g mask="url(#cut)">
+<g transform="${FLIP}" fill="url(#w)" fill-rule="evenodd"><path d="${letters[0]}"/></g>
+</g>
+</g>
+</svg>
+`;
+}
+
+fs.writeFileSync(path.join(ROOT, "assets", "favicon.svg"), favicon());
+made += 1;
+console.log(`${"favicon.svg".padEnd(32)} k 한 글자 ${THEMES.dark.accent}→${THEMES.dark.accent2}, 배경 ${FAV.bg}`);
+
+console.log(`\n${made}개 만들었습니다. 워드마크는 배경이 비치고(마스크로 뚫음), 파비콘만 배경을 깝니다.`);
 console.log("헤더가 어느 것을 쓸지는 assets/style.css 의 .brand .wordmark 에서 정합니다.");
