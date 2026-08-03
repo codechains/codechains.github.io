@@ -247,20 +247,48 @@ const outline = (post) =>
     .filter((l) => /^##\s+/.test(l))
     .map((l) => l.replace(/^#+\s+/, "").trim());
 
-/* 하루 세 편. 아침 출근길, 점심, 밤.
+/* ---------- 발행 시각 ----------
    쓰레드는 아직 팔로우하지 않은 계정의 글을 넓게 노출시키는 단계라, 올리는 횟수가 곧 기회입니다.
    하루 한두 편이면 그 기회를 거의 안 쓰고, 열 편을 넘기면 한 계정이 피드를 덮어 오히려 언팔이 늡니다.
-   밤 21시대를 넣은 이유는 한국 사용자가 가장 붐비는 시간이라서입니다.
-   이 시각이 정답이라서가 아니라, 빈 칸으로 두면 결국 하루에 몰아서 올리게 되기 때문에 미리 박아 둡니다. */
-const SLOTS = ["08:20", "12:40", "21:10"];
-function slotDates(startDate, count) {
+   그래서 평일 3~4편, 주말 2편을 기준으로 둡니다.
+
+   규칙적일수록 손해입니다. 매일 정확히 세 번, 그것도 같은 분에 올라가면 사람이 아니라
+   예약 발행으로 읽힙니다. 그렇게 보이는 계정에는 댓글이 안 붙고, 댓글이 안 붙으면 노출이 떨어집니다.
+   그래서 편수도 분도 매번 다시 뽑습니다. 시간대만 지킵니다. */
+
+// 하루 편수별 시간대. 21시대는 한국 사용자가 가장 붐비는 시간이라 몇 편이든 항상 씁니다.
+const HOUR_SETS = {
+  1: [[21]],
+  2: [[8, 21], [12, 21], [8, 12]],
+  3: [[8, 12, 21]],
+  4: [[8, 12, 18, 21]],
+};
+const pad = (n) => String(n).padStart(2, "0");
+const pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
+const isWeekend = (date) => [0, 6].includes(new Date(`${date}T00:00:00Z`).getUTCDay());
+
+/* 그날 몇 편을 올릴지. 주말은 줄이고 평일은 3~4편을 오가되 가끔 2편으로 쉽니다.
+   남은 편수를 같이 보는 이유는, 마지막 날에 한 편만 덩그러니 남으면
+   그날 계정이 쉬는 것처럼 보이기 때문입니다. */
+function daySize(date, left) {
+  if (left <= 2) return left;
+  // 요일을 먼저 봅니다. 남은 편수로 먼저 자르면 마지막 주말에 네 편이 몰립니다.
+  let size = Math.min(isWeekend(date) ? 2 : pick([2, 3, 3, 4, 4]), left);
+  if (left - size === 1) size = Math.min(size + 1, 4, left); // 다음 날 한 편만 남기지 않기
+  if (left - size === 1) size = Math.max(size - 1, 2); // 그래도 하나 남으면 두 편을 넘기기
+  return Math.min(size, left);
+}
+
+/* 날짜만 더하는 계산이라 UTC 자정을 기준으로 잡습니다.
+   +09:00 으로 만들면 toISOString 이 UTC 로 되돌리면서 하루 앞 날짜가 찍힙니다. */
+function scheduleFor(startDate, count) {
   const out = [];
-  /* 날짜만 더하는 계산이라 UTC 자정을 기준으로 잡습니다.
-     +09:00 으로 만들면 toISOString 이 UTC 로 되돌리면서 하루 앞 날짜가 찍힙니다. */
-  const base = new Date(`${startDate}T00:00:00Z`);
-  for (let i = 0; i < count; i++) {
-    const d = new Date(base.getTime() + Math.floor(i / SLOTS.length) * 86400000);
-    out.push(`${d.toISOString().slice(0, 10)} ${SLOTS[i % SLOTS.length]}`);
+  let day = new Date(`${startDate}T00:00:00Z`);
+  while (out.length < count) {
+    const date = day.toISOString().slice(0, 10);
+    const size = daySize(date, count - out.length);
+    pick(HOUR_SETS[size]).forEach((h) => out.push(`${date} ${pad(h)}:${pad(Math.floor(Math.random() * 60))}`));
+    day = new Date(day.getTime() + 86400000);
   }
   return out;
 }
@@ -270,7 +298,7 @@ function seedFrom(post, startDate) {
   const heads = outline(post);
   // 소제목 수에서 출발하되 3의 배수로 맞춥니다(3, 6, 9). 하루 세 편이 기준이라 딱 떨어져야 합니다.
   const count = Math.min(Math.max(Math.round(heads.length / PER_DAY) * PER_DAY, PER_DAY), PER_DAY * 3);
-  const when = slotDates(startDate, count);
+  const when = scheduleFor(startDate, count);
 
   const body = when
     .map((at, i) => {
@@ -358,4 +386,4 @@ function cli(argv) {
 
 if (require.main === module) cli(process.argv.slice(2));
 
-module.exports = { LIMIT, SOFT, PER_DAY, STATUS, KIND, loadThreads, queueOf, queueStats, checkPost, batchIssues, countChars, seedFrom };
+module.exports = { LIMIT, SOFT, PER_DAY, STATUS, KIND, loadThreads, queueOf, queueStats, checkPost, batchIssues, countChars, seedFrom, scheduleFor };
