@@ -314,52 +314,138 @@ const outline = (post) =>
 /* ---------- 발행 시각 ----------
    쓰레드는 아직 팔로우하지 않은 계정의 글을 넓게 노출시키는 단계라, 올리는 횟수가 곧 기회입니다.
    하루 한두 편이면 그 기회를 거의 안 쓰고, 열 편을 넘기면 한 계정이 피드를 덮어 오히려 언팔이 늡니다.
-   그래서 평일 3~4편, 주말 2편을 기준으로 둡니다.
+   그래서 평일 2~3편을 기준으로 둡니다.
+
+   주말은 다르게 봅니다. 토요일은 아예 쉬고, 일요일은 일상 편 하나만 올립니다.
+   쉬는 날이 있어야 나머지 날이 성실해 보이고, 주말에 일 이야기를 들고 오는 계정은 피곤합니다.
+   읽는 사람도 사장이라 주말에는 일 생각을 안 하고 싶습니다.
 
    규칙적일수록 손해입니다. 매일 정확히 세 번, 그것도 같은 분에 올라가면 사람이 아니라
    예약 발행으로 읽힙니다. 그렇게 보이는 계정에는 댓글이 안 붙고, 댓글이 안 붙으면 노출이 떨어집니다.
    그래서 편수도 분도 매번 다시 뽑습니다. 시간대만 지킵니다. */
 
-// 하루 편수별 시간대. 21시대는 한국 사용자가 가장 붐비는 시간이라 몇 편이든 항상 씁니다.
+/* 하루 편수별 시간대. 21시대는 한국 사용자가 가장 붐비는 시간이라 몇 편이든 항상 씁니다.
+   일요일은 한 편뿐이라 아침과 저녁 중에 고릅니다. 매주 같은 시각이면 그것도 규칙이 됩니다. */
 const HOUR_SETS = {
-  1: [[21]],
+  1: [[10], [21]],
   2: [[8, 21], [12, 21], [8, 12]],
   3: [[8, 12, 21]],
   4: [[8, 12, 18, 21]],
 };
 const pad = (n) => String(n).padStart(2, "0");
 const pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
-const isWeekend = (date) => [0, 6].includes(new Date(`${date}T00:00:00Z`).getUTCDay());
+const dowOfDate = (date) => new Date(`${date}T00:00:00Z`).getUTCDay();
 
-/* 그날 몇 편을 올릴지. 주말은 줄이고 평일은 3~4편을 오가되 가끔 2편으로 쉽니다.
-   남은 편수를 같이 보는 이유는, 마지막 날에 한 편만 덩그러니 남으면
-   그날 계정이 쉬는 것처럼 보이기 때문입니다. */
-function daySize(date, left) {
-  if (left <= 2) return left;
-  // 요일을 먼저 봅니다. 남은 편수로 먼저 자르면 마지막 주말에 네 편이 몰립니다.
-  /* 평일 2~3편, 주말 2편. 상한을 3으로 둔 이유는 두 가지입니다.
-     하나, 소재가 마르는 속도. 블로그 한 편에서 아홉 편이 나오는데 하루 네 편이면 이틀 반이면 끝납니다.
-     둘, 줄이는 건 눈에 띕니다. 네 편 하다가 두 편으로 내려가면 식은 계정으로 읽히지만,
-     두세 편으로 시작해서 올리는 건 아무도 눈치채지 못하면서 계정이 커지는 것처럼 보입니다. */
-  let size = Math.min(isWeekend(date) ? 2 : pick([2, 3, 3]), left);
-  if (left - size === 1) size = Math.min(size + 1, 4, left); // 다음 날 한 편만 남기지 않기
-  if (left - size === 1) size = Math.max(size - 1, 2); // 그래도 하나 남으면 두 편을 넘기기
-  return Math.min(size, left);
+/* 요일 규칙.
+     토요일  안 올립니다. 쉬는 날이 있어야 나머지 날이 성실해 보입니다.
+     일요일  한 편만, 그것도 일상 편으로. 주말에 일 이야기를 들고 오는 계정은 피곤합니다.
+     평일    2~3편. 매일 정확히 세 편이면 사람이 아니라 예약 발행으로 읽힙니다. */
+const SAT = 6;
+const SUN = 0;
+const MIN_DAY = 2;
+const MAX_DAY = 3;
+
+const iso = (d) => d.toISOString().slice(0, 10);
+const addDay = (d, n) => new Date(d.getTime() + n * 86400000);
+
+/* 편수를 여러 날에 흩습니다. 앞에서부터 3편씩 몰면 주 초반만 시끄러워지므로 자리를 섞습니다. */
+function spread(total, days) {
+  const out = Array(days).fill(MIN_DAY);
+  let extra = total - MIN_DAY * days;
+  const idx = out.map((_, i) => i);
+  for (let i = idx.length - 1; i > 0; i -= 1) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [idx[i], idx[j]] = [idx[j], idx[i]];
+  }
+  for (let k = 0; k < extra && k < idx.length; k += 1) out[idx[k]] += 1;
+  return out;
 }
 
-/* 날짜만 더하는 계산이라 UTC 자정을 기준으로 잡습니다.
-   +09:00 으로 만들면 toISOString 이 UTC 로 되돌리면서 하루 앞 날짜가 찍힙니다. */
-function scheduleFor(startDate, count) {
+/* 편들이 나갈 날짜와 시각을 정합니다. kinds 는 큐 순서대로의 성격 배열입니다.
+
+   일요일에 일상 편이 오게 하는 방법이 두 가지입니다. 편 순서를 바꾸거나, 평일 편수를 조절하거나.
+   여기서는 뒤쪽을 씁니다. 순서를 바꾸면 번호와 발행 순서가 어긋나고, 앞 편을 가리키며 쓴 문장이
+   뒤로 가버립니다. 평일을 2편으로 할지 3편으로 할지는 어차피 매번 다시 뽑는 값이라
+   그걸 조절하는 쪽은 아무것도 망가뜨리지 않습니다.
+
+   못 맞추는 주가 있으면 경고만 내고 넘어갑니다. 날짜가 아예 안 정해지는 것보다 낫습니다. */
+function planSchedule(kinds, startDate) {
   const out = [];
+  const warn = [];
+  let i = 0;
   let day = new Date(`${startDate}T00:00:00Z`);
-  while (out.length < count) {
-    const date = day.toISOString().slice(0, 10);
-    const size = daySize(date, count - out.length);
-    // 분은 1~59. 정각을 빼는 이유는 08:00 같은 시각이 예약 발행처럼 보이는 대표적인 모양이라서입니다.
-    pick(HOUR_SETS[size]).forEach((h) => out.push(`${date} ${pad(h)}:${pad(1 + Math.floor(Math.random() * 59))}`));
-    day = new Date(day.getTime() + 86400000);
+
+  const put = (date, size) => {
+    pick(HOUR_SETS[size]).forEach((h) => {
+      // 분은 1~59. 정각을 빼는 이유는 08:00 같은 시각이 예약 발행처럼 보이는 대표적인 모양이라서입니다.
+      out.push(`${date} ${pad(h)}:${pad(1 + Math.floor(Math.random() * 59))}`);
+      i += 1;
+    });
+  };
+
+  while (i < kinds.length) {
+    // 다음 일요일까지의 평일들을 모읍니다. 토요일은 빼고요.
+    const weekdays = [];
+    let cur = new Date(day);
+    while (cur.getUTCDay() !== SUN) {
+      if (cur.getUTCDay() !== SAT) weekdays.push(iso(cur));
+      cur = addDay(cur, 1);
+    }
+    const sunday = iso(cur);
+    const left = kinds.length - i;
+    const W = weekdays.length;
+
+    if (!W) {
+      // 오늘이 일요일입니다
+      if (kinds[i] !== "life") warn.push(`${sunday} (일) 에 업무 편이 놓입니다.`);
+      put(sunday, 1);
+      day = addDay(cur, 1);
+      continue;
+    }
+
+    /* 일요일까지 갈 만큼 남았으면, 일요일 자리에 일상 편이 오도록 평일 총량을 고릅니다.
+       고를 수 있는 폭은 평일 하루 2~3편이라 [2W, 3W] 입니다. */
+    const lo = MIN_DAY * W;
+    const hi = MAX_DAY * W;
+    let total;
+    if (left > hi) {
+      const mid = Math.round((MIN_DAY + MAX_DAY) / 2 * W);
+      const fit = [];
+      for (let t = lo; t <= hi; t += 1) if (kinds[i + t] === "life") fit.push(t);
+      total = fit.length
+        ? fit.sort((a, b) => Math.abs(a - mid) - Math.abs(b - mid))[0]
+        : (warn.push(`${sunday} (일) 에 놓을 일상 편이 없습니다.`), mid);
+    } else {
+      total = left; // 이번 주 평일에 다 들어갑니다. 일요일까지 안 갑니다.
+    }
+
+    // 평일에 뿌립니다. 남은 편이 적으면 하루 2편도 못 채우므로 앞날부터 채우고 멈춥니다.
+    let dist = total >= lo ? spread(total, W) : [];
+    if (!dist.length) {
+      let rest = total;
+      for (const _ of weekdays) {
+        if (rest <= 0) break;
+        const size = Math.min(rest === MAX_DAY + 1 ? MIN_DAY : Math.min(MAX_DAY, rest), rest);
+        dist.push(size);
+        rest -= size;
+      }
+    }
+    dist.forEach((size, k) => size && put(weekdays[k], size));
+
+    if (i >= kinds.length) break;
+
+    if (kinds[i] !== "life") warn.push(`${sunday} (일) 에 업무 편이 놓입니다.`);
+    put(sunday, 1);
+    day = addDay(cur, 1);
   }
-  return out;
+
+  return { when: out, warn };
+}
+
+/* 성격을 모르는 자리(새 배치 뼈대)에서 부릅니다. 전부 업무로 보고 일요일을 비워 둡니다.
+   일요일 자리는 일상 편의 것이라, 업무 배치가 미리 차지하면 나중에 끼울 데가 없습니다. */
+function scheduleFor(startDate, count, kinds) {
+  return planSchedule(kinds || Array(count).fill("work"), startDate).when;
 }
 
 function seedFrom(post, startDate, afterId) {
@@ -511,6 +597,39 @@ function writeText(dir, id, part, text) {
   throw new Error(`${id} 을 찾지 못했습니다.`);
 }
 
+/* 아직 안 올린 편들의 날짜와 시각을 요일 규칙에 맞춰 다시 짭니다.
+
+   규칙이 바뀌면 이미 짜둔 큐도 같이 바뀌어야 합니다. 마흔 줄을 손으로 고치면 반드시 실수가 납니다.
+   순서는 건드리지 않습니다. 번호와 발행 순서가 어긋나면 앞 편을 가리키며 쓴 문장이 뒤로 갑니다.
+   발행한 편은 지나간 기록이라 그대로 둡니다. */
+function replan(dir, startDate) {
+  const queue = queueOf(loadThreads(dir));
+  const todo = queue.filter((p) => p.status !== "posted");
+  if (!todo.length) return { moved: 0, warn: [], first: "", last: "" };
+
+  const { when, warn } = planSchedule(todo.map((p) => p.kind), startDate);
+  const at = new Map(todo.map((p, i) => [p.id, when[i]]));
+
+  const files = fs.readdirSync(dir).filter((f) => f.endsWith(".md") && !f.startsWith("_"));
+  let moved = 0;
+  files.forEach((f) => {
+    const p = path.join(dir, f);
+    const raw = fs.readFileSync(p, "utf8");
+    const crlf = /\r\n/.test(raw);
+    const out = (crlf ? raw.replace(/\r\n/g, "\n") : raw).replace(/^=== .*$/gm, (line) => {
+      const m = parseMeta(line.replace(/^=== */, ""));
+      const slot = at.get(m.id);
+      if (!slot || m.status === "posted") return line;
+      const [date, time] = slot.split(" ");
+      moved += 1;
+      return `=== ${[date, m.id, time, m.kind, m.status, ...m.unknown].filter(Boolean).join(" ")}`;
+    });
+    fs.writeFileSync(p, crlf ? out.replace(/\n/g, "\r\n") : out);
+  });
+
+  return { moved, warn, first: when[0], last: when[when.length - 1] };
+}
+
 /* 아직 안 올린 편들의 날짜를 통째로 미룹니다.
    큐를 짜둔 뒤 며칠 미루는 일은 늘 생깁니다. 그때 마흔 줄을 손으로 고치면 실수가 납니다.
    이미 posted 인 편은 건드리지 않습니다. 지나간 기록이라서요. */
@@ -542,6 +661,18 @@ function cli(argv) {
   if (argv.includes("--ids")) {
     const added = writeIds(THREADS);
     console.log(added ? `고유번호 ${added}개를 붙였습니다.` : "번호가 빠진 편이 없습니다.");
+    return;
+  }
+
+  const replanArg = argv.find((a) => /^--replan(=\d{4}-\d{2}-\d{2})?$/.test(a));
+  if (replanArg) {
+    const start = replanArg.includes("=") ? replanArg.split("=")[1] : new Date().toISOString().slice(0, 10);
+    const r = replan(THREADS, start);
+    console.log(`아직 안 올린 ${r.moved}편의 날짜와 시각을 다시 짰습니다.`);
+    console.log(`  ${r.first} 부터 ${r.last} 까지`);
+    console.log("  토요일 0편 · 일요일 1편(일상) · 평일 2~3편");
+    r.warn.forEach((m) => console.log(`  경고: ${m}`));
+    console.log("발행한 편은 건드리지 않았습니다.");
     return;
   }
 
@@ -614,4 +745,4 @@ function cli(argv) {
 
 if (require.main === module) cli(process.argv.slice(2));
 
-module.exports = { LIMIT, SOFT, PER_DAY, STATUS, KIND, loadThreads, queueOf, queueStats, checkPost, batchIssues, countChars, seedFrom, scheduleFor, nextId, fillIds, writeIds, markPosted, writeText };
+module.exports = { LIMIT, SOFT, PER_DAY, STATUS, KIND, loadThreads, queueOf, queueStats, checkPost, batchIssues, countChars, seedFrom, scheduleFor, nextId, fillIds, writeIds, markPosted, writeText, planSchedule, replan };
