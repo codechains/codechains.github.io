@@ -10,7 +10,8 @@
     "wordmark": "node scripts/make-wordmark.js",
     "thread": "node scripts/threads.js",
     "thread:token": "node scripts/threads-token.js",
-    "thread:publish": "node scripts/threads-publish.js"
+    "thread:publish": "node scripts/threads-publish.js",
+    "notify": "node scripts/notify-setup.js"
   },
   "keywords": [],
   "author": "",
