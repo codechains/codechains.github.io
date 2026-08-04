@@ -122,4 +122,40 @@ async function notifyPosted({ id, at, len, link }) {
   return false;
 }
 
-module.exports = { notifyPosted };
+/* 무언가 실패했다고 알립니다.
+
+   이게 없으면 토큰이 만료돼도 아무 일이 안 일어납니다.
+   발행이 조용히 멈추고, 알림도 안 오니 "오늘은 글이 없네" 하고 며칠 지나서야 알게 됩니다.
+   자동화에서 제일 위험한 건 틀리는 게 아니라 조용히 안 도는 것입니다. */
+async function notifyFailed({ what, url }) {
+  const head = `실패: ${what}`;
+  for (const [label, send] of [["텔레그램", telegram], ["왓츠앱", whatsappCloud], ["CallMeBot", callMeBot]]) {
+    try {
+      if (await send({ head, link: url || "" })) {
+        console.log(`실패를 알렸습니다 (${label}).`);
+        return true;
+      }
+    } catch (e) {
+      console.warn(`알림 실패 (${label}): ${e.message}`);
+      return false;
+    }
+  }
+  return false;
+}
+
+module.exports = { notifyPosted, notifyFailed };
+
+/* 액션에서 바로 부를 수 있게 해둡니다.
+     node scripts/notify.js fail "쓰레드 발행" "https://github.com/.../runs/123" */
+if (require.main === module) {
+  const [kind, what, url] = process.argv.slice(2);
+  if (kind !== "fail") {
+    console.error('쓰는 법: node scripts/notify.js fail "무엇이" "주소"');
+    process.exitCode = 1;
+  } else {
+    notifyFailed({ what: what || "이름 없는 작업", url }).catch((e) => {
+      console.error("알림 실패:", e.message);
+      // 알림이 안 갔다고 액션을 또 실패시키지는 않습니다. 이미 실패한 뒤에 부르는 자리입니다.
+    });
+  }
+}

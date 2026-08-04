@@ -21,6 +21,9 @@ jobs:
     # 발행 워크플로와 같은 스위치를 봅니다. 준비 전에는 돌지 않습니다.
     if: ${{ vars.THREADS_ENABLED == '1' }}
     runs-on: ubuntu-latest
+    env:
+      TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
+      TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -46,3 +49,11 @@ jobs:
           gh secret set THREADS_ACCESS_TOKEN --body "$(cat token.txt)"
           rm -f token.txt
           echo "새 토큰을 저장했습니다."
+
+      # 갱신이 실패했는데 아무도 모르면, 남은 유효기간이 줄어드는 것을 지켜보기만 하게 됩니다.
+      # 여덟 번의 기회가 하나씩 사라지는 동안 알 방법이 이것뿐입니다.
+      - name: 실패 알리기
+        if: failure()
+        run: |
+          node scripts/notify.js fail "쓰레드 토큰 갱신 (60일 만료 전에 고쳐야 합니다)" \
+            "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
