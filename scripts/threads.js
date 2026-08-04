@@ -440,6 +440,77 @@ function markPosted(dir, id, when) {
   throw new Error(`${id} 를 찾지 못했습니다. 표시를 못 남기면 다음 실행이 같은 편을 또 올립니다.`);
 }
 
+/* 관리 화면에서 고친 본문을 파일에 다시 씁니다.
+   원고의 원본은 언제나 content/threads 의 마크다운입니다. 화면은 그것을 비추기만 합니다.
+   그래서 여기서도 그 파일을 직접 고치고, 나머지 줄은 한 글자도 건드리지 않습니다.
+
+   준비됨(ready) 인 편만 고칠 수 있습니다.
+   발행됨은 이미 쓰레드에 올라간 글이라 여기서 고쳐봐야 화면과 실제가 어긋나기만 합니다.
+   초안은 아직 뼈대라 에디터에서 통째로 쓰는 편이 낫고요. */
+function writeText(dir, id, part, text) {
+  /* 브라우저의 편집기가 섞어 넣는 것들을 걷어냅니다.
+     줄바꿈은 \n 으로, 안 보이는 공백(nbsp)은 보통 공백으로. 안 그러면 파일에 눈에 안 띄는 글자가 남습니다. */
+  const clean = String(text)
+    .replace(/\r\n?/g, "\n")
+    .replace(/ /g, " ")
+    .replace(/[ \t]+$/gm, "")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+  if (!clean) throw new Error("내용이 비어 있습니다.");
+  // === 나 --- 를 본문에 넣으면 저장하는 순간 한 편이 두 편으로 쪼개집니다.
+  if (/^[ \t]*(===|---)[ \t]*$/m.test(clean)) throw new Error("본문에 === 나 --- 만 있는 줄은 넣을 수 없습니다. 편이 쪼개집니다.");
+  if (countChars(clean) > LIMIT) throw new Error(`${countChars(clean)}자입니다. 상한 ${LIMIT}자를 넘어 저장하지 않습니다.`);
+
+  const files = fs.readdirSync(dir).filter((f) => f.endsWith(".md") && !f.startsWith("_"));
+  for (const f of files) {
+    const p = path.join(dir, f);
+    /* 줄 끝이 파일마다 다를 수 있습니다.
+       깃이 윈도우에서 체크아웃하면 CRLF 로 쓰고, 이 스크립트가 쓰면 LF 입니다.
+       읽을 때 LF 로 맞춰서 다루고, 쓸 때 원래 방식으로 되돌립니다.
+       안 그러면 손대지 않은 줄까지 전부 바뀐 것으로 잡혀 무엇을 고쳤는지 알아볼 수 없게 됩니다. */
+    const raw = fs.readFileSync(p, "utf8");
+    const crlf = /\r\n/.test(raw);
+    const lines = (crlf ? raw.replace(/\r\n/g, "\n") : raw).split("\n");
+
+    let head = -1;
+    for (let i = 0; i < lines.length; i += 1) {
+      if (!/^=== /.test(lines[i])) continue;
+      const m = parseMeta(lines[i].replace(/^=== */, ""));
+      if (m.id !== id) continue;
+      if (m.status === "posted") throw new Error(`${id} 은 이미 발행된 편입니다. 여기서는 고칠 수 없습니다.`);
+      if (m.status !== "ready") throw new Error(`${id} 은 준비됨 상태가 아닙니다. 에디터에서 여세요.`);
+      head = i;
+      break;
+    }
+    if (head < 0) continue;
+
+    let end = lines.length;
+    for (let i = head + 1; i < lines.length; i += 1) if (/^=== /.test(lines[i])) { end = i; break; }
+
+    const body = lines.slice(head + 1, end).join("\n");
+    /* 메모가 섞인 본문은 손대지 않습니다. 화면에는 메모가 지워진 채로 보이므로
+       그대로 저장하면 파일에서 메모가 조용히 사라집니다. */
+    if (body.includes("<!--")) throw new Error(`${id} 본문에 메모(<!-- -->)가 있습니다. 파일을 직접 여세요.`);
+
+    // 답글 경계는 남기고 해당 조각만 갈아 끼웁니다. 빈 조각은 편으로 세지 않습니다(splitReplies 와 같은 기준).
+    const chunks = body.split(/^[ \t]*---[ \t]*$/m);
+    const live = chunks.map((c, i) => (c.trim() ? i : -1)).filter((i) => i >= 0);
+    const at = live[Number(part || 1) - 1];
+    if (at === undefined) throw new Error(`${id} 에 ${part}번째 조각이 없습니다.`);
+    /* 앞뒤 빈 줄은 원래 있던 만큼 그대로 둡니다.
+       그래야 안 고치고 저장했을 때 파일이 한 바이트도 안 바뀝니다.
+       매번 여백이 한 줄씩 달라지면 무엇을 실제로 고쳤는지 커밋 기록에서 알아볼 수 없게 됩니다. */
+    const lead = at === 0 ? "" : (chunks[at].match(/^\n*/) || ["\n"])[0] || "\n";
+    const tail = (chunks[at].match(/\n*$/) || ["\n"])[0] || "\n";
+    chunks[at] = `${lead}${clean}${tail}`;
+
+    const out = [...lines.slice(0, head + 1), ...chunks.join("---").split("\n"), ...lines.slice(end)].join("\n");
+    fs.writeFileSync(p, crlf ? out.replace(/\n/g, "\r\n") : out);
+    return { file: f, len: countChars(clean) };
+  }
+  throw new Error(`${id} 을 찾지 못했습니다.`);
+}
+
 /* 아직 안 올린 편들의 날짜를 통째로 미룹니다.
    큐를 짜둔 뒤 며칠 미루는 일은 늘 생깁니다. 그때 마흔 줄을 손으로 고치면 실수가 납니다.
    이미 posted 인 편은 건드리지 않습니다. 지나간 기록이라서요. */
@@ -543,4 +614,4 @@ function cli(argv) {
 
 if (require.main === module) cli(process.argv.slice(2));
 
-module.exports = { LIMIT, SOFT, PER_DAY, STATUS, KIND, loadThreads, queueOf, queueStats, checkPost, batchIssues, countChars, seedFrom, scheduleFor, nextId, fillIds, writeIds, markPosted };
+module.exports = { LIMIT, SOFT, PER_DAY, STATUS, KIND, loadThreads, queueOf, queueStats, checkPost, batchIssues, countChars, seedFrom, scheduleFor, nextId, fillIds, writeIds, markPosted, writeText };

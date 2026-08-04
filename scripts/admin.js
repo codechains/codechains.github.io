@@ -107,7 +107,31 @@ footer a{color:#7aa2ff}
 button.copy{background:#1a2233;border:1px solid #262d3a;color:#7aa2ff;border-radius:6px;padding:.2rem .55rem;font:inherit;font-size:.76rem;cursor:pointer}
 button.copy:hover{border-color:#7aa2ff;color:#e6e9ef}
 button.copy.done{color:#6ee7b7;border-color:#2c5a44}
+/* 복사 버튼은 평소에 숨겨 둡니다. 매일 보는 화면이라 늘 떠 있으면 눈에 걸립니다.
+   자리는 그대로 비워 두어(visibility) 나타날 때 줄이 흔들리지 않게 합니다. */
+.seg-head button.copy{visibility:hidden}
+.th:hover .seg-head button.copy,.seg-head button.copy.save{visibility:visible}
+/* 저장 버튼. 고치는 중에만 나오므로 복사와 확실히 다른 색으로 둡니다. */
+button.copy.save{background:#12251d;border-color:#2c5a44;color:#6ee7b7;font-weight:600}
+button.copy.save:hover{border-color:#6ee7b7;color:#e6e9ef}
 pre.seg-body{margin:0;padding:.7rem .75rem;white-space:pre-wrap;word-break:break-word;font:inherit;color:#cdd3df;background:#0e1116}
+/* 고칠 수 있는 본문은 마우스를 올리면 글자 커서가 뜹니다. 눌러 보면 고쳐진다는 유일한 힌트입니다. */
+pre.seg-body[data-edit]{cursor:text}
+/* 고치는 중. 바탕과 글자를 뒤집습니다.
+   테두리나 아이콘 대신 반전을 쓰는 이유는, 격자에 카드가 스물여덟 장 떠 있어도
+   지금 손대고 있는 한 덩어리가 어느 것인지 곁눈으로도 바로 보이기 때문입니다. */
+pre.seg-body.editing{background:#cdd3df;color:#0e1116;caret-color:#0e1116;outline:none}
+pre.seg-body.editing::selection{background:#0e1116;color:#cdd3df}
+.seg.editing{border-color:#6ee7b7}
+.seg-head .hint{color:#5c6478;font-size:.7rem}
+/* 이미 올라간 편은 흐리게 둡니다. 큐에서 눈이 가야 하는 곳은 아직 안 나간 편이라서요.
+   본문도 잠급니다. 쓰레드에 이미 나간 글이라 여기서 고쳐봐야 실제 글은 안 바뀝니다
+   (쓰레드는 올린 뒤 5분이 지나면 수정 자체가 안 됩니다). 고칠 수 있는 것처럼 보이지 않게 합니다. */
+.th.done{opacity:.5}
+.th.done:hover{opacity:1}
+.th.done pre.seg-body{cursor:not-allowed;user-select:text}
+button.copy.sync{visibility:visible;margin-left:.2rem}
+.howto .note{color:#5c6478;font-size:.76rem;margin-top:.4rem}
 .b-ready{background:#12222f;color:#7dd3fc}
 .b-posted{background:#1c1c24;color:#8b93a7}
 .b-th-none{background:#241a1f;color:#c98b9b}
@@ -354,8 +378,172 @@ const CONTROL_JS = `<script>
     } else if (legacyCopy(text)) flash(btn, label);
     else alert('복사하지 못했습니다. 직접 선택해서 복사하세요.');
   }
+  /* 본문 고치기.
+     준비됨인 편은 본문을 눌러 그 자리에서 고칩니다. 입력창을 따로 띄우지 않는 이유는,
+     고치는 동안에도 옆 카드들이 그대로 보여야 "이 편만 톤이 튀나"를 볼 수 있기 때문입니다.
+
+     고치는 중이라는 표시는 바탕과 글자를 뒤집는 것 하나입니다.
+     복사 버튼은 평소에 숨어 있다가 이때만 '저장'으로 나옵니다. 화면에 뜨는 버튼이 하나뿐이면
+     지금 무엇을 하는 중인지 헷갈릴 일이 없습니다. */
+  var LIMIT = ${LIMIT}, SOFT = ${SOFT};
+  var SKEY = 'cc-admin-scroll';
+
+  function btnOf(pre){ return pre.closest('.seg').querySelector('button.copy'); }
+  function countChars(s){ return Array.from(s).length; }
+
+  /* 고치는 중에는 개발 서버의 자동 새로고침을 막습니다.
+     저장하면 파일이 바뀌고, 파일이 바뀌면 새로고침이 옵니다. 그때 다른 카드를 고치는 중이었다면
+     적어 둔 것이 통째로 날아갑니다. 다 저장하고 나면 다음 새로고침에 화면이 따라잡습니다. */
+  window.__ccHold = function(){ return !!document.querySelector('pre.seg-body.editing'); };
+
+  function retune(pre){
+    var n = countChars(pre.innerText.replace(/\\s+$/, ''));
+    var len = pre.closest('.seg').querySelector('.len');
+    if (!len) return;
+    len.textContent = n + '자';
+    len.className = 'len' + (n > LIMIT ? ' over' : n > SOFT ? ' near' : '');
+  }
+
+  function enter(pre){
+    if (pre.classList.contains('editing')) return;
+    pre.setAttribute('data-was', pre.innerText);
+    pre.classList.add('editing');
+    pre.closest('.seg').classList.add('editing');
+    // plaintext-only 면 붙여넣기가 서식 없이 들어옵니다. 지원하지 않는 브라우저는 true 로 내려갑니다.
+    pre.contentEditable = 'plaintext-only';
+    if (pre.contentEditable !== 'plaintext-only') pre.contentEditable = 'true';
+    var b = btnOf(pre);
+    b.textContent = '저장';
+    b.classList.add('save');
+    b.classList.remove('done');
+  }
+
+  function leave(pre){
+    pre.classList.remove('editing');
+    pre.closest('.seg').classList.remove('editing');
+    pre.contentEditable = 'false';
+    pre.removeAttribute('data-was');
+    var b = btnOf(pre);
+    b.textContent = '복사';
+    b.classList.remove('save');
+  }
+
+  function cancel(pre){
+    var was = pre.getAttribute('data-was');
+    if (was !== null) pre.textContent = was;
+    retune(pre);
+    leave(pre);
+  }
+
+  /* 저장은 파일에 쓰는 것으로 끝나지 않습니다.
+     쓰레드에 실제로 올리는 것은 깃허브 액션이고, 액션이 읽는 것은 깃허브에 올라간 파일입니다.
+     로컬에만 저장되면 화면에는 고친 글이 보이는데 쓰레드에는 옛 글이 나갑니다.
+     그래서 서버가 받아오기 → 쓰기 → 커밋 → 올리기까지 한 번에 하고, 그 결과를 여기서 받습니다.
+     몇 초 걸립니다. 그동안 버튼이 '올리는 중'으로 붙잡혀 있는 것이 정상입니다. */
+  function save(pre){
+    var text = pre.innerText;
+    if (text === pre.getAttribute('data-was')) { leave(pre); return; } // 안 바뀌었으면 깃허브를 건드리지 않습니다
+    var b = btnOf(pre);
+    b.disabled = true;
+    b.textContent = '올리는 중';
+    try { sessionStorage.setItem(SKEY, String(window.pageYOffset)); } catch(err) {}
+
+    var done = function(msg){
+      b.disabled = false;
+      b.textContent = '저장';
+      try { sessionStorage.removeItem(SKEY); } catch(e2) {}
+      alert(msg);
+    };
+
+    fetch('/__thread-save', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ id: pre.getAttribute('data-id'), part: Number(pre.getAttribute('data-part')), text: text })
+    }).then(function(r){ return r.json(); })
+      .then(function(j){
+        if (!j.ok) { done('저장하지 못했습니다.\\n\\n' + (j.error || '')); return; }
+        if (!j.pushed) {
+          /* 파일에는 썼는데 깃허브에 못 올라간 경우입니다.
+             이대로 두면 내일 아침 쓰레드에는 고치기 전 글이 나갑니다. 그냥 넘어가면 안 됩니다. */
+          alert('로컬 파일에는 저장했지만 깃허브에 올리지 못했습니다.\\n' +
+                '이대로 두면 쓰레드에는 고치기 전 글이 나갑니다.\\n\\n' +
+                (j.error || '') + '\\n\\n터미널에서 직접 올리세요:\\n  git push origin main');
+        }
+        b.textContent = '올렸습니다';
+        b.disabled = false;
+        leave(pre);
+        /* 새로 그립니다. 저장하면서 깃허브의 발행 표시까지 받아왔을 수 있어,
+           화면과 파일이 어긋나지 않으려면 여기서 한 번 맞추고 가는 편이 확실합니다. */
+        setTimeout(function(){ location.reload(); }, 600);
+      }, function(err){
+        done('저장하지 못했습니다. 개발 서버가 떠 있는지 보세요.\\n\\n' + err);
+      });
+  }
+
+  // 새로고침 뒤 보던 자리로. 저장 직후에만 씁니다.
+  try {
+    var back = sessionStorage.getItem(SKEY);
+    if (back !== null) { sessionStorage.removeItem(SKEY); window.scrollTo(0, Number(back)); }
+  } catch(e) {}
+
+  /* 깃허브에서 받아오기.
+     발행 표시는 깃허브 액션이 남깁니다. 이 PC 는 받아오기 전까지 그것을 모릅니다.
+     그래서 오전에 화면을 열면 이미 나간 편이 아직 준비됨으로 보일 수 있습니다. 그때 이 버튼을 누릅니다. */
+  var sync = document.getElementById('thSync');
+  if (sync) sync.addEventListener('click', function(){
+    sync.disabled = true;
+    var old = sync.textContent;
+    sync.textContent = '받아오는 중';
+    try { sessionStorage.setItem(SKEY, String(window.pageYOffset)); } catch(e) {}
+    fetch('/__thread-sync', { method: 'POST' })
+      .then(function(r){ return r.json(); })
+      .then(function(j){
+        sync.disabled = false;
+        if (!j.ok) { sync.textContent = old; try { sessionStorage.removeItem(SKEY); } catch(e2) {} alert('받아오지 못했습니다.\\n\\n' + j.error); return; }
+        if (!j.changed) { sync.textContent = '최신입니다'; try { sessionStorage.removeItem(SKEY); } catch(e2) {} setTimeout(function(){ sync.textContent = old; }, 1500); return; }
+        sync.textContent = '받았습니다';
+        setTimeout(function(){ location.reload(); }, 400);
+      }, function(err){
+        sync.disabled = false; sync.textContent = old;
+        try { sessionStorage.removeItem(SKEY); } catch(e2) {}
+        alert('받아오지 못했습니다. 개발 서버가 떠 있는지 보세요.\\n\\n' + err);
+      });
+  });
+
+  /* mousedown 에서 켭니다. 뒤이어 오는 클릭이 브라우저 기본 동작으로 커서를 찍어 주므로
+     누른 그 글자 사이에 커서가 놓입니다. click 에서 켜면 커서가 맨 앞으로 갑니다. */
+  document.addEventListener('mousedown', function(e){
+    if (!e.target || !e.target.closest) return;
+    var pre = e.target.closest('pre.seg-body[data-edit]');
+    if (pre) enter(pre);
+  });
+
+  document.addEventListener('input', function(e){
+    if (e.target && e.target.classList && e.target.classList.contains('editing')) retune(e.target);
+  });
+
+  document.addEventListener('keydown', function(e){
+    var pre = e.target && e.target.closest ? e.target.closest('pre.seg-body.editing') : null;
+    if (!pre) return;
+    if (e.key === 'Escape') { e.preventDefault(); cancel(pre); pre.blur(); }
+    // 저장 버튼까지 손을 옮기지 않아도 되게. 손이 자판에 있는 동안이 대부분이라
+    else if ((e.ctrlKey || e.metaKey) && (e.key === 's' || e.key === 'Enter')) { e.preventDefault(); save(pre); }
+  });
+
+  // plaintext-only 를 못 쓰는 브라우저에서 서식이 딸려 들어오는 것을 막습니다
+  document.addEventListener('paste', function(e){
+    var pre = e.target && e.target.closest ? e.target.closest('pre.seg-body.editing') : null;
+    if (!pre || !e.clipboardData) return;
+    e.preventDefault();
+    document.execCommand('insertText', false, e.clipboardData.getData('text/plain'));
+  });
+
   document.addEventListener('click', function(e){
     if (!e.target || !e.target.closest) return;
+    // 고치는 중이면 같은 버튼이 저장입니다. 복사보다 먼저 봅니다.
+    var s = e.target.closest('button.copy.save');
+    if (s) { save(s.closest('.seg').querySelector('pre.seg-body')); return; }
+
     var one = e.target.closest('button.copy[data-seg]');
     if (one) {
       copyText(one.closest('.seg').querySelector('pre.seg-body').textContent, one, '복사됨');
@@ -392,9 +580,19 @@ function postCard(p) {
   const [scls, slabel] = THREAD_BADGE[p.status] || THREAD_BADGE.draft;
   const [kcls, klabel] = KIND_BADGE[p.kind] || KIND_BADGE.work;
 
+  /* 준비됨인 편만 화면에서 바로 고칩니다.
+     발행됨은 이미 쓰레드에 올라가 있어 여기서 고쳐도 실제 글은 안 바뀝니다(그쪽은 5분 지나면 수정 자체가 안 됩니다).
+     초안은 아직 뼈대라 에디터에서 통째로 쓰는 편이 빠르고요. */
+  const editable = p.status === "ready" && p.id;
+
   const parts = p.parts
     .map((s) => {
       const state = s.len > LIMIT ? " over" : s.len > SOFT ? " near" : "";
+      const edit = editable
+        ? ` data-edit="1" data-id="${esc(p.id)}" data-part="${s.n}" title="눌러서 그 자리에서 고칩니다"`
+        : p.status === "posted"
+          ? ` title="이미 쓰레드에 올라간 편이라 고칠 수 없습니다"`
+          : ` title="초안입니다. 에디터에서 여세요"`;
       return `<div class="seg">
       <div class="seg-head">
         <span class="no">${p.parts.length > 1 ? `${s.n}번째` : "본문"}</span>
@@ -402,7 +600,7 @@ function postCard(p) {
         <span class="grow"></span>
         <button class="copy" type="button" data-seg="${s.n}">복사</button>
       </div>
-      <pre class="seg-body">${esc(s.text)}</pre>
+      <pre class="seg-body"${edit}>${esc(s.text)}</pre>
     </div>`;
     })
     .join("\n");
@@ -418,7 +616,7 @@ function postCard(p) {
 
   /* 카드가 세 개씩 가로로 서므로 머리에는 시각과 배지만 둡니다.
      날짜는 줄 머리에 한 번만 나오고, 파일 경로처럼 폭을 잡아먹는 것은 아래로 내립니다. */
-  return `<article class="th">
+  return `<article class="th${p.status === "posted" ? " done" : ""}">
     <div class="th-head">
       <span class="pid">${esc(p.id || "----")}</span>
       <span class="when">${esc(p.time || "시각 미정")}</span>
@@ -468,7 +666,9 @@ function threadsView(queue, stats, contentDir, batches) {
      쓰는 방법은 템플릿(content/_thread-template.md) 안에 주석으로 붙어 있어, 원고를 열면 거기 있습니다. */
   const howto = `<div class="howto">
   <b>큐</b> · ${mix}
-  · <a data-path="${uriPath(tplPath)}" href="${editorHref(tplPath)}">템플릿 열기</a>${runWarn}${batchWarn}
+  · <a data-path="${uriPath(tplPath)}" href="${editorHref(tplPath)}">템플릿 열기</a>
+  · <button class="copy sync" type="button" id="thSync" title="발행 표시는 깃허브 액션이 남깁니다. 이 PC 는 받아오기 전까지 모릅니다.">깃허브에서 받아오기</button>
+  <div class="note">준비됨 편은 본문을 눌러 그 자리에서 고칩니다. 저장하면 깃허브까지 함께 올라갑니다. 발행됨 편은 고칠 수 없습니다.</div>${runWarn}${batchWarn}
 </div>`;
 
   if (!queue.length) {

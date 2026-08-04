@@ -16,7 +16,9 @@
      · 한 번 실행에 한 편만 올립니다. 버그가 나도 큐가 통째로 나가지 않습니다.
      · 하루 상한을 넘기면 올리지 않습니다.
      · status 가 ready 인 편만 올립니다. draft 는 건드리지 않습니다.
-     · 예약 시각이 너무 지난 편은 건너뜁니다. 새벽 세 시에 아침 글이 나가는 게 제일 이상합니다.
+     · 언제나 큐에서 가장 이른 편부터 올립니다. 건너뛰지 않습니다.
+       예약 시각이 너무 지났으면 그 편을 건너뛰는 대신 아예 멈춥니다.
+       건너뛰면 순서가 뒤집혀 계정의 첫 글이 인사가 아니라 본론이 되어 버립니다.
    ============================================================ */
 const path = require("path");
 const T = require("./threads");
@@ -33,12 +35,17 @@ const DAILY_CAP = 3;        // 하루에 올릴 수 있는 최대 편수
 const LATE_LIMIT_MIN = 120; // 예약 시각이 이만큼 넘게 지났으면 건너뜁니다
 const SETTLE_MS = 30000;    // 컨테이너를 만든 뒤 발행까지 두는 시간(메타 권장)
 
-/* 한국 시각 기준으로 계산합니다. 깃허브 액션은 UTC 로 돌기 때문에
-   여기서 시간대를 고정하지 않으면 아홉 시간이 어긋납니다. */
+/* 시각 다루기.
+   깃허브 액션은 UTC 로 돌고 우리 예약 시각은 한국 시각이라, 둘을 섞으면 아홉 시간이 어긋납니다.
+
+   그래서 역할을 나눕니다.
+     비교는 항상 진짜 시각(epoch)으로 합니다.
+     한국 시각은 화면에 찍거나 "오늘"을 가를 때만 씁니다.
+   보정한 값을 그대로 비교에 쓰면 아홉 시간 뒤의 편까지 "시각이 됐다"고 잡습니다. */
 const KST = 9 * 60 * 60 * 1000;
-const nowKst = () => new Date(Date.now() + KST);
-const kstStamp = (d) => d.toISOString().slice(0, 16); // 2026-08-03T09:02
-const kstDate = (d) => d.toISOString().slice(0, 10);
+const kstStamp = (ms) => new Date(ms + KST).toISOString().slice(0, 16); // 2026-08-03T09:02
+const kstDate = (ms) => new Date(ms + KST).toISOString().slice(0, 10);
+const scheduledAt = (p) => new Date(`${p.date}T${p.time}:00+09:00`).getTime();
 
 async function call(endpoint, params) {
   const r = await fetch(`${API}/${USER_ID}/${endpoint}`, {
@@ -62,7 +69,7 @@ async function publish(text) {
 function main() {
   const batches = T.loadThreads(DIR);
   const queue = T.queueOf(batches);
-  const now = nowKst();
+  const now = Date.now();
   const today = kstDate(now);
 
   /* 오늘 이미 몇 편 나갔는지. 실제로 올라간 시각을 먼저 보고, 없으면 예약 날짜로 셉니다.
@@ -73,31 +80,36 @@ function main() {
 
   const due = queue.filter((p) => {
     if (p.status !== "ready" || !p.date || !p.time) return false;
-    return new Date(`${p.date}T${p.time}:00+09:00`) <= now;
+    return scheduledAt(p) <= now;
   });
 
-  const late = (p) => (now - new Date(`${p.date}T${p.time}:00+09:00`)) / 60000;
-  const skipped = due.filter((p) => late(p) > LATE_LIMIT_MIN);
-  const ready = due.filter((p) => late(p) <= LATE_LIMIT_MIN);
+  const late = (p) => (now - scheduledAt(p)) / 60000;
 
   console.log(`지금 ${kstStamp(now)} (한국 시각)`);
   console.log(`큐 ${queue.length}편 · 오늘 나간 것 ${sentToday}/${DAILY_CAP} · 시각이 된 것 ${due.length}편`);
-
-  skipped.forEach((p) => {
-    console.warn(`  건너뜀: ${p.id} (${p.at}) 예약 시각이 ${Math.round(late(p) / 60)}시간 지났습니다.`);
-    console.warn(`          올리려면 === 줄의 시각을 지금으로 고치세요.`);
-  });
 
   if (sentToday >= DAILY_CAP) {
     console.log(`오늘 상한(${DAILY_CAP}편)을 채웠습니다. 올리지 않습니다.`);
     return;
   }
-  if (!ready.length) {
+  if (!due.length) {
     console.log("지금 올릴 편이 없습니다.");
     return;
   }
 
-  const post = ready[0];
+  /* 항상 큐에서 가장 이른 편부터 올립니다. 건너뛰지 않습니다.
+
+     예약 시각이 많이 지났다고 그 편을 건너뛰고 다음 편을 올리면 순서가 뒤집힙니다.
+     계정의 첫 글이 인사가 아니라 본론이 되어 버리는 식으로요.
+     늦은 것보다 순서가 어긋나는 쪽이 훨씬 큰 손해라, 늦었으면 아예 멈추고 사람을 부릅니다.
+     고치는 법은 하나입니다. npm run thread -- --shift=N 으로 큐를 통째로 당기거나 미루세요. */
+  const post = due[0];
+  if (late(post) > LATE_LIMIT_MIN) {
+    console.warn(`\n멈춥니다. ${post.id} (${post.at}) 의 예약 시각이 ${Math.round(late(post) / 60)}시간 지났습니다.`);
+    console.warn("이 편을 건너뛰고 다음 편을 올리면 순서가 뒤집히므로 아무것도 올리지 않습니다.");
+    console.warn("큐를 다시 맞추세요:  npm run thread -- --shift=N");
+    return;
+  }
   const text = post.parts.map((x) => x.text).join("\n\n");
 
   if (post.parts.length > 1) {
@@ -127,7 +139,7 @@ function main() {
   }
 
   return publish(text).then((mediaId) => {
-    const file = T.markPosted(DIR, post.id, kstStamp(nowKst()));
+    const file = T.markPosted(DIR, post.id, kstStamp(Date.now()));
     console.log(`\n올렸습니다. media id ${mediaId}`);
     console.log(`${file} 의 ${post.id} 에 posted 표시를 남겼습니다.`);
   });

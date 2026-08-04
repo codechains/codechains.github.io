@@ -74,6 +74,28 @@ async function get(url) {
 
 const days = (sec) => Math.round(sec / 86400);
 
+/* 토큰을 명령줄 인자 대신 여기서 받습니다.
+   인자로 주면 셸 기록(PowerShell 의 ConsoleHost_history.txt 등)에 그대로 남습니다. */
+function ask(prompt) {
+  return new Promise((resolve) => {
+    process.stdout.write(prompt);
+    let buf = "";
+    process.stdin.setEncoding("utf8");
+    const onData = (d) => {
+      buf += d;
+      if (!buf.includes("\n")) return;
+      /* 다 읽었으면 stdin 을 완전히 놓아 줍니다.
+         pause 만 하면 핸들이 열린 채 남아 윈도우에서 종료할 때 오류가 납니다. */
+      process.stdin.off("data", onData);
+      process.stdin.pause();
+      process.stdin.unref();
+      resolve(buf.split("\n")[0].trim());
+    };
+    process.stdin.on("data", onData);
+    process.stdin.resume();
+  });
+}
+
 async function main() {
   const [cmd, arg] = process.argv.slice(2);
 
@@ -123,16 +145,39 @@ async function main() {
 
   if (cmd === "me") {
     /* 앱 대시보드의 User Token Generator 로 토큰을 받으면 토큰만 나오고 사용자 ID 는 안 나옵니다.
-       발행 스크립트에는 둘 다 필요해서, 토큰으로 ID 를 되물어 봅니다. */
-    const token = arg || process.env.THREADS_ACCESS_TOKEN;
-    if (!token) { console.error("토큰을 붙여 주세요. npm run thread:token me <토큰>"); process.exit(1); }
-    const r = await get(`${API}/v1.0/me?fields=id,username,threads_profile_picture_url` +
+       발행 스크립트에는 둘 다 필요해서, 토큰으로 ID 를 되물어 봅니다.
+
+       --save 를 붙이면 깃허브 시크릿까지 여기서 바로 넣습니다(gh 명령 사용).
+       토큰이 이 PC 밖으로 나가는 곳은 쓰레드와 깃허브뿐입니다. */
+    const token = arg && !arg.startsWith("--") ? arg : await ask("토큰을 붙여넣고 엔터: ");
+    if (!token) { console.error("토큰이 없습니다."); process.exit(1); }
+
+    const r = await get(`${API}/v1.0/me?fields=id,username` +
       `&access_token=${encodeURIComponent(token)}`);
     console.log(`\n계정: @${r.username}`);
-    console.log("\n깃허브 시크릿에 아래 두 개를 넣으세요.");
-    console.log("  Settings → Secrets and variables → Actions → New repository secret\n");
-    console.log(`THREADS_USER_ID       ${r.id}`);
-    console.log(`THREADS_ACCESS_TOKEN  ${token}`);
+    console.log(`사용자 ID: ${r.id}`);
+
+    if (!process.argv.includes("--save")) {
+      console.log("\n깃허브 시크릿에 아래 두 개를 넣으세요.");
+      console.log("  Settings → Secrets and variables → Actions → New repository secret\n");
+      console.log(`  THREADS_USER_ID       ${r.id}`);
+      console.log(`  THREADS_ACCESS_TOKEN  (방금 넣은 토큰)`);
+      console.log("\n--save 를 붙이면 여기서 바로 넣어 드립니다.");
+      return;
+    }
+
+    /* 값을 표준입력으로 넘깁니다. 명령줄 인자로 주면 셸 기록에 토큰이 그대로 남습니다. */
+    const { spawnSync } = require("child_process");
+    const set = (name, value) => {
+      const p = spawnSync("gh", ["secret", "set", name], { input: value, encoding: "utf8", shell: process.platform === "win32" });
+      if (p.status !== 0) throw new Error(`gh secret set ${name} 실패: ${(p.stderr || p.stdout || "").trim()}`);
+      console.log(`  ${name} 저장`);
+    };
+    console.log("\n깃허브 시크릿에 넣는 중...");
+    set("THREADS_USER_ID", String(r.id));
+    set("THREADS_ACCESS_TOKEN", token);
+    console.log("\n이제 자동화를 켜는 스위치만 남았습니다.");
+    console.log("  gh variable set THREADS_ENABLED --body 1");
     return;
   }
 
@@ -149,13 +194,20 @@ async function main() {
     return;
   }
 
-  console.log("쓰는 법:");
-  console.log("  npm run thread:token auth              권한 요청 주소 보기");
-  console.log("  npm run thread:token code <코드>       60일 토큰 받기");
+  console.log("쓰는 법:\n");
+  console.log("  npm run thread:token me -- --save      토큰을 물어보고 깃허브 시크릿까지 저장 (권장)");
+  console.log("  npm run thread:token me                토큰으로 사용자 ID 만 확인");
+  console.log("");
+  console.log("  npm run thread:token auth              (토큰 생성기가 없을 때) 권한 요청 주소 보기");
+  console.log("  npm run thread:token code <코드>       (토큰 생성기가 없을 때) 60일 토큰 받기");
   console.log("  npm run thread:token refresh <토큰>    60일 더 늘리기");
+  console.log("");
+  console.log("토큰은 명령줄에 적지 말고 물어볼 때 붙여넣으세요. 인자로 주면 셸 기록에 남습니다.");
 }
 
 main().catch((e) => {
   console.error("실패:", e.message);
-  process.exit(1);
+  /* process.exit 로 즉시 끊지 않습니다. 토큰을 물어보느라 열어 둔 stdin 이 정리되는 중에
+     강제로 끝내면 윈도우에서 libuv 어설션이 찍혀 진짜 오류 메시지가 묻힙니다. */
+  process.exitCode = 1;
 });
