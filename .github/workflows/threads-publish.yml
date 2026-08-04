@@ -53,7 +53,9 @@ jobs:
           THREADS_LIVE: ${{ vars.THREADS_LIVE }}
           THREADS_USER_ID: ${{ secrets.THREADS_USER_ID }}
           THREADS_ACCESS_TOKEN: ${{ secrets.THREADS_ACCESS_TOKEN }}
-          # 발행 알림(왓츠앱). 넣지 않으면 알림만 건너뛰고 발행은 그대로 됩니다.
+          # 발행 알림. 넣지 않으면 알림만 건너뛰고 발행은 그대로 됩니다.
+          TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
           WA_PHONE_ID: ${{ secrets.WA_PHONE_ID }}
           WA_TOKEN: ${{ secrets.WA_TOKEN }}
           WA_TO: ${{ secrets.WA_TO }}

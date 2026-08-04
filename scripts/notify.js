@@ -4,7 +4,13 @@
    쓰레드에 글이 올라가면 링크와 함께 알려 줍니다.
    자동 발행은 사람이 안 보는 사이에 도는 일이라, 잘 나갔는지 확인할 길이 하나는 있어야 합니다.
 
-   두 가지 길이 있고, 설정된 쪽으로 보냅니다. 아무것도 설정하지 않으면 조용히 넘어갑니다.
+   세 가지 길이 있고, 설정된 쪽으로 보냅니다. 아무것도 설정하지 않으면 조용히 넘어갑니다.
+
+   [0] 텔레그램 (기본)
+       봇을 하나 만들어 나에게만 보냅니다. 공식 API 라 승인도 과금도 없습니다.
+       받는 사람이 나 하나뿐이라, 왓츠앱 쪽의 제약(템플릿 승인, 24시간 창)이 아예 안 걸립니다.
+         TELEGRAM_TOKEN    BotFather 가 준 봇 토큰
+         TELEGRAM_CHAT_ID  내 대화방 번호
 
    [1] 왓츠앱 클라우드 API (메타 공식)
        쓰레드 앱을 만든 그 메타 계정에서 그대로 이어서 씁니다. 중간에 남의 서비스가 없습니다.
@@ -26,6 +32,22 @@
    ============================================================ */
 
 const timeout = (ms) => AbortSignal.timeout(ms);
+
+async function telegram({ head, link }) {
+  const token = process.env.TELEGRAM_TOKEN;
+  const chat = process.env.TELEGRAM_CHAT_ID;
+  if (!token || !chat) return false;
+
+  const r = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ chat_id: chat, text: link ? `${head}\n${link}` : head }),
+    signal: timeout(20000),
+  });
+  const body = await r.text();
+  if (!r.ok) throw new Error(`텔레그램 ${r.status} ${body.slice(0, 300)}`);
+  return true;
+}
 
 async function whatsappCloud({ head, link }) {
   const id = process.env.WA_PHONE_ID;
@@ -80,7 +102,8 @@ async function notifyPosted({ id, at, len, link }) {
   /* 조사를 붙이지 않습니다. 편 번호가 AA01 이든 시험이든 어색해지지 않고,
      폰 알림 창에 잘려 보여도 앞부분만으로 무슨 일인지 알 수 있습니다. */
   const head = `쓰레드 발행: ${id} · ${at} · ${len}자`;
-  for (const [label, send] of [["왓츠앱", whatsappCloud], ["CallMeBot", callMeBot]]) {
+  // 설정된 첫 번째 것으로 보냅니다. 텔레그램이 앞에 있는 이유는 이게 기본이기 때문입니다.
+  for (const [label, send] of [["텔레그램", telegram], ["왓츠앱", whatsappCloud], ["CallMeBot", callMeBot]]) {
     try {
       if (await send({ head, link })) {
         console.log(`알림을 보냈습니다 (${label}).`);
