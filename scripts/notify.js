@@ -100,8 +100,12 @@ async function callMeBot({ head, link }) {
 /* 올렸다고 알립니다. 실패해도 예외를 밖으로 던지지 않습니다. */
 async function notifyPosted({ id, at, len, link }) {
   /* 조사를 붙이지 않습니다. 편 번호가 AA01 이든 시험이든 어색해지지 않고,
-     폰 알림 창에 잘려 보여도 앞부분만으로 무슨 일인지 알 수 있습니다. */
+     폰 알림 창에 잘려 보여도 앞부분만으로 무슨 일인지 알 수 있습니다.
+
+     주소를 못 받았을 때 그냥 빼면, 알림을 받고도 왜 링크가 없는지 몰라 한참 찾게 됩니다.
+     그래서 없으면 없다고 적습니다. */
   const head = `쓰레드 발행: ${id} · ${at} · ${len}자`;
+  if (!link) link = "(주소를 받지 못했습니다. 쓰레드 앱에서 확인하세요)";
   // 설정된 첫 번째 것으로 보냅니다. 텔레그램이 앞에 있는 이유는 이게 기본이기 때문입니다.
   for (const [label, send] of [["텔레그램", telegram], ["왓츠앱", whatsappCloud], ["CallMeBot", callMeBot]]) {
     try {

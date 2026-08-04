@@ -148,11 +148,14 @@ async function main() {
   process.env.TELEGRAM_TOKEN = token;
   process.env.TELEGRAM_CHAT_ID = String(chat.id);
   console.log("시험 알림을 보냅니다...");
+  /* 진짜 발행 때는 여기에 쓰레드 글 주소가 들어갑니다.
+     시험에 블로그 주소 같은 진짜 링크를 넣으면, 나중에 그게 원래 오는 것인 줄 알게 됩니다.
+     그래서 시험이라는 것이 문구에서 바로 드러나게 둡니다. */
   const sent = await require("./notify").notifyPosted({
-    id: "시험",
+    id: "시험 (실제 발행이 아닙니다)",
     at: new Date(Date.now() + 9 * 3600 * 1000).toISOString().slice(0, 16).replace("T", " "),
     len: 0,
-    link: "https://kadecho.dev/",
+    link: "여기에 실제 쓰레드 글 주소가 들어갑니다",
   });
   if (!sent) {
     console.error("\n보내지 못했습니다. 깃허브에는 아무것도 넣지 않았습니다.");

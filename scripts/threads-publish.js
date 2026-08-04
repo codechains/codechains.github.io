@@ -75,18 +75,28 @@ async function call(endpoint, params) {
 }
 
 /* 올린 글의 실제 주소.
-   발행 응답은 media id 만 줍니다. 사람이 눌러서 볼 수 있는 주소는 따로 물어봐야 나옵니다.
-   못 받아와도 발행 자체는 이미 끝난 일이라, 알림에 주소가 빠지는 것으로 그칩니다. */
-async function permalinkOf(mediaId) {
-  try {
-    const r = await fetch(`${API}/${mediaId}?fields=permalink&access_token=${encodeURIComponent(TOKEN)}`);
-    const body = await r.text();
-    if (!r.ok) throw new Error(`${r.status} ${body}`);
-    return JSON.parse(body).permalink || "";
-  } catch (e) {
-    console.warn(`주소를 받아오지 못했습니다: ${e.message}`);
-    return "";
+
+   발행 응답은 media id 만 줍니다. 그건 내부 번호라 눌러도 아무 데도 안 갑니다.
+   사람이 눌러서 볼 수 있는 주소(permalink)는 따로 물어봐야 나옵니다.
+   알림을 만드는 목적이 "지금 올라간 그 글로 바로 가기" 라서, 이 주소가 알림의 본체입니다.
+
+   막 올린 직후에는 아직 안 나오는 경우가 있어 몇 번 더 물어봅니다.
+   그래도 없으면 주소 없이 알립니다. 글은 이미 올라갔으니 알림을 거르는 것보다 낫습니다. */
+async function permalinkOf(mediaId, tries = 4) {
+  for (let i = 0; i < tries; i += 1) {
+    try {
+      const r = await fetch(`${API}/${mediaId}?fields=permalink&access_token=${encodeURIComponent(TOKEN)}`);
+      const body = await r.text();
+      if (!r.ok) throw new Error(`${r.status} ${body.slice(0, 200)}`);
+      const link = JSON.parse(body).permalink;
+      if (link) return link;
+      console.warn(`주소가 아직 안 나왔습니다 (${i + 1}/${tries}).`);
+    } catch (e) {
+      console.warn(`주소를 받아오지 못했습니다 (${i + 1}/${tries}): ${e.message}`);
+    }
+    if (i < tries - 1) await new Promise((r) => setTimeout(r, 3000));
   }
+  return "";
 }
 
 /* 기다리는 동안 관리 화면에서 원고를 고쳤을 수 있습니다.
