@@ -193,6 +193,10 @@ function jsonLdTag(obj) {
   return `<script type="application/ld+json">${json}</script>\n`;
 }
 
+/* 스레드 아이콘. 푸터에 한 번 들어가는 게 전부라 파일로 빼지 않고 인라인으로 둡니다.
+   fill="currentColor" 라서 푸터 글자색(다크·라이트, hover)을 그대로 따라갑니다. */
+const THREADS_ICON = `<svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" aria-hidden="true" focusable="false"><path d="M12.186 24h-.007c-3.581-.024-6.334-1.205-8.184-3.509C2.35 18.44 1.5 15.586 1.472 12.01v-.017c.03-3.579.879-6.43 2.525-8.482C5.845 1.205 8.6.024 12.18 0h.014c2.746.02 5.043.725 6.826 2.098 1.677 1.29 2.858 3.13 3.509 5.467l-2.04.569c-1.104-3.96-3.898-5.984-8.304-6.015-2.91.022-5.11.936-6.54 2.717C4.307 6.504 3.616 8.914 3.589 12c.027 3.086.718 5.496 2.057 7.164 1.43 1.783 3.631 2.698 6.54 2.717 2.623-.02 4.358-.631 5.8-2.045 1.647-1.613 1.618-3.593 1.09-4.798-.31-.71-.873-1.3-1.634-1.75-.192 1.352-.622 2.446-1.284 3.272-.886 1.102-2.14 1.704-3.73 1.79-1.202.065-2.361-.218-3.259-.801-1.063-.689-1.685-1.74-1.752-2.964-.065-1.19.408-2.285 1.33-3.082.88-.76 2.119-1.207 3.583-1.291a13.853 13.853 0 0 1 3.02.142c-.126-.742-.375-1.332-.75-1.757-.513-.586-1.308-.883-2.359-.89h-.029c-.844 0-1.992.232-2.721 1.32L7.734 7.847c.98-1.454 2.568-2.256 4.478-2.256h.044c3.194.02 5.097 1.975 5.287 5.388.108.046.216.094.321.142 1.49.7 2.58 1.761 3.154 3.07.797 1.82.871 4.79-1.548 7.158-1.85 1.81-4.094 2.628-7.277 2.65Zm1.003-11.69c-.242 0-.487.007-.739.021-1.836.103-2.98.946-2.916 2.143.067 1.256 1.452 1.839 2.784 1.767 1.224-.065 2.818-.543 3.086-3.71a10.5 10.5 0 0 0-2.215-.221z"/></svg>`;
+
 function layout({ lang, title, description, canonical, langAltHref, active, body, autoLang, noAlt, noIndex, ogType, published, jsonLd, card }) {
   const t = T[lang];
   const isEn = lang === "en";
@@ -275,6 +279,7 @@ ${body}
 <footer class="site-footer"><div class="wrap">
   <span>© ${esc(authorName(lang))} · ${esc(site.brand)}</span>
   <span class="foot-links">
+    ${isEn || !site.threadsUrl ? "" : `<a class="foot-icon" href="${site.threadsUrl}" target="_blank" rel="me noopener" title="Threads" aria-label="Threads">${THREADS_ICON}</a>`}
     <a href="/feed.xml">RSS</a>
   </span>
 </div></footer>
@@ -463,9 +468,16 @@ function buildAbout(lang) {
   const isEn = lang === "en";
   const file = path.join(CONTENT, isEn ? "about-en.md" : "about.md");
   const parsed = fm(read(file));
+  /* 본문 맨 끝(연락 줄) 아래에 붙는 스레드 계정 한 줄.
+     about.md 안에 SVG 를 박아 두면 글이 마크업으로 지저분해지므로 여기서 이어 붙입니다.
+     계정 이름은 주소에서 뽑아 쓰므로 site.json 의 threadsUrl 한 곳만 고치면 됩니다. */
+  const threadsHandle = (site.threadsUrl || "").split("/").filter(Boolean).pop();
+  const threadsLine = isEn || !site.threadsUrl
+    ? ""
+    : `<p class="about-threads"><a href="${site.threadsUrl}" target="_blank" rel="me noopener">${THREADS_ICON}<span>${esc(threadsHandle)}</span></a></p>`;
   const body = `<article class="article">
   <div class="article-head"><h1>${esc(parsed.attributes.title)}</h1></div>
-  <div class="prose">${marked.parse(parsed.body)}</div>
+  <div class="prose">${marked.parse(parsed.body)}${threadsLine}</div>
 </article>
 ${newsletter(lang)}`;
   const canonical = isEn ? "/en/about/" : "/about/";

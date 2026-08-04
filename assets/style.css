@@ -638,10 +638,29 @@ main.wrap {
 
 .foot-links {
   display: inline-flex;
+  align-items: center;
   gap: 14px;
 }
 .foot-links a { color: var(--muted); }
 .foot-links a:hover { color: var(--accent-2); text-decoration: none; }
+
+/* 아이콘 링크(스레드). fill 이 currentColor 라 위의 색·hover 규칙을 그대로 물려받습니다.
+   inline-flex 로 감싸는 이유는 svg 밑에 생기는 기준선 여백을 없애 RSS 글자와 높이를 맞추기 위해서입니다. */
+.foot-icon {
+  display: inline-flex;
+  align-items: center;
+}
+
+/* ---------- 소개 페이지 스레드 한 줄 ---------- */
+/* 바로 위 "연락:" 줄과 짝을 이루도록 문단 간격을 좁혔습니다. */
+.about-threads {
+  margin-top: -.6em;
+}
+.about-threads a {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
 
 /* ---------- 반응형 ---------- */
 @media (max-width: 560px) {
