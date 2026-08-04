@@ -15,10 +15,15 @@
    인자로 주면 파워셸 명령 기록(ConsoleHost_history.txt)에 그대로 남습니다.
 
    CallMeBot 열쇠 받는 법
-     1. 왓츠앱에서 +34 644 51 95 23 을 연락처에 추가합니다
+     1. 왓츠앱에서 +34 644 05 92 17 을 연락처에 추가합니다
      2. 그 번호로 아래 문장을 그대로 보냅니다
           I allow callmebot to send me messages
-     3. 답장으로 열쇠(apikey)가 옵니다
+     3. 2분 안에 답장으로 열쇠(apikey)가 옵니다
+
+   봇 번호는 종종 바뀝니다. 옛 번호로 보내면 읽음 표시는 뜨는데 열쇠가 오지 않습니다.
+   안 오면 이 번호부터 현재 것인지 확인하세요.
+     https://www.callmebot.com/blog/free-api-whatsapp-messages/
+   번호가 맞는데도 2분 안에 안 오면, 안내에 따르면 24시간 뒤에 다시 시도해야 합니다.
    ============================================================ */
 const { spawnSync } = require("child_process");
 
@@ -76,9 +81,11 @@ const set = (name, value) => {
 async function main() {
   console.log("쓰레드 발행 알림을 켭니다 (CallMeBot).\n");
   console.log("아직 열쇠가 없다면 먼저 이것부터 하세요.");
-  console.log("  1. 왓츠앱에서 +34 644 51 95 23 을 연락처에 추가");
+  console.log("  1. 왓츠앱에서 +34 644 05 92 17 을 연락처에 추가");
   console.log("  2. 그 번호로 보내기:  I allow callmebot to send me messages");
-  console.log("  3. 답장으로 오는 열쇠를 복사\n");
+  console.log("  3. 2분 안에 답장으로 오는 열쇠를 복사\n");
+  console.log("  열쇠가 안 오면 봇 번호가 바뀐 것입니다. 아래에서 현재 번호를 확인하세요.");
+  console.log("  https://www.callmebot.com/blog/free-api-whatsapp-messages/\n");
 
   const phone = await ask("받을 번호 (국가번호까지 숫자만, 예 821012345678): ");
   if (!/^\d{8,15}$/.test(phone)) {
