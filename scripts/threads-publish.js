@@ -74,6 +74,21 @@ async function call(endpoint, params) {
   return JSON.parse(body);
 }
 
+/* 올린 글의 실제 주소.
+   발행 응답은 media id 만 줍니다. 사람이 눌러서 볼 수 있는 주소는 따로 물어봐야 나옵니다.
+   못 받아와도 발행 자체는 이미 끝난 일이라, 알림에 주소가 빠지는 것으로 그칩니다. */
+async function permalinkOf(mediaId) {
+  try {
+    const r = await fetch(`${API}/${mediaId}?fields=permalink&access_token=${encodeURIComponent(TOKEN)}`);
+    const body = await r.text();
+    if (!r.ok) throw new Error(`${r.status} ${body}`);
+    return JSON.parse(body).permalink || "";
+  } catch (e) {
+    console.warn(`주소를 받아오지 못했습니다: ${e.message}`);
+    return "";
+  }
+}
+
 /* 기다리는 동안 관리 화면에서 원고를 고쳤을 수 있습니다.
    깃허브 액션은 회차가 시작할 때 받아온 파일을 그대로 들고 있어서, 그대로 올리면 옛 글이 나갑니다.
    올리기 직전에 한 번 더 받아와 지금 원고를 씁니다.
@@ -206,12 +221,23 @@ function main() {
   return new Promise((r) => setTimeout(r, waitMs))
     .then(() => refresh(post, text))
     .then((fresh) => publish(fresh))
-    .then((mediaId) => {
+    .then(async (mediaId) => {
       const done = Date.now();
       const file = T.markPosted(DIR, post.id, kstStamp(done));
       console.log(`\n올렸습니다. media id ${mediaId}`);
       console.log(`예약 ${post.at} · 실제 ${kstStamp(done).replace("T", " ")} (${Math.round((done - at) / 1000)}초 차이)`);
       console.log(`${file} 의 ${post.id} 에 posted 표시를 남겼습니다.`);
+
+      /* 알림은 여기서, 표시를 남긴 뒤에 보냅니다.
+         알림이 먼저 나가고 표시가 실패하면 다음 회차가 같은 편을 또 올립니다. 순서가 중요합니다. */
+      const link = await permalinkOf(mediaId);
+      if (link) console.log(`주소 ${link}`);
+      await require("./notify").notifyPosted({
+        id: post.id,
+        at: kstStamp(done).replace("T", " "),
+        len: post.len,
+        link,
+      });
     });
 }
 
