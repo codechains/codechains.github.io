@@ -18,12 +18,17 @@ on:
 
 jobs:
   refresh:
+    # 발행 워크플로와 같은 스위치를 봅니다. 준비 전에는 돌지 않습니다.
+    if: ${{ vars.THREADS_ENABLED == '1' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: 20
+          cache: npm
+
+      - run: npm ci
 
       - name: 토큰 늘리기
         id: refresh
