@@ -498,7 +498,10 @@ ${newsletter(lang)}`;
   return layout({ lang, title: parsed.attributes.title, description: parsed.attributes.description, canonical, langAltHref: langAlt, active: "about", body, jsonLd });
 }
 
-function buildPost(lang, post) {
+/* hasAlt: 같은 슬러그의 다른 언어판이 실제로 발행돼 있는가.
+   없는 주소를 hreflang 으로 가리키면 구글은 상호 참조가 안 된다고 보고 그 짝을 통째로 무시하고,
+   x-default 까지 404 면 국제 타게팅 자체가 깨집니다. 그래서 짝이 있을 때만 alternate 를 냅니다. */
+function buildPost(lang, post, hasAlt) {
   const t = T[lang];
   const isEn = lang === "en";
   const tags = (post.tags || []).map((x) => `<span class="tag">${esc(x)}</span>`).join("");
@@ -520,9 +523,11 @@ function buildPost(lang, post) {
 </article>
 ${newsletter(lang)}`;
   const canonical = `${isEn ? "/en/posts/" : "/posts/"}${post.slug}/`;
-  const langAlt = `${isEn ? "/posts/" : "/en/posts/"}${post.slug}/`;
+  // 짝이 없으면 머리말의 언어 링크는 그 언어의 홈으로 보냅니다(없는 글 주소로 보내 404 를 만들지 않도록)
+  const langAlt = hasAlt ? `${isEn ? "/posts/" : "/en/posts/"}${post.slug}/` : isEn ? "/" : "/en/";
   return layout({
     lang, title: post.title, description: post.description, canonical, langAltHref: langAlt, active: "home", body,
+    noAlt: !hasAlt,
     ogType: "article",
     published: post.stamp,
     card: cardFor(lang, post.slug), // 글마다 제목이 박힌 카드. 없으면 공용 카드로 내려갑니다
@@ -568,6 +573,9 @@ const koAll = loadPosts(path.join(CONTENT, "posts-kr"));
 const enAll = loadPosts(path.join(CONTENT, "posts-en"));
 const koPosts = published(koAll);
 const enPosts = published(enAll);
+// 언어판이 짝을 이루는지 확인하는 데 씁니다(hreflang 을 낼지, 한 언어로만 낼지)
+const koSlugs = new Set(koPosts.map((p) => p.slug));
+const enSlugs = new Set(enPosts.map((p) => p.slug));
 // 초안은 검사 대상이 아닙니다(아직 다듬는 중이므로). 공개되는 글만 봅니다.
 const koSeo = checkSeo(koPosts, "ko");
 const enSeo = checkSeo(enPosts, "en");
@@ -579,11 +587,11 @@ const latestEn = enPosts[0] && enPosts[0].date;
 
 write("index.html", buildHome("ko", koPosts)); urls.push({ loc: "/", lastmod: latestKo });
 write("about/index.html", buildAbout("ko")); urls.push({ loc: "/about/" });
-koPosts.forEach((p) => { write(`posts/${p.slug}/index.html`, buildPost("ko", p)); urls.push({ loc: `/posts/${p.slug}/`, lastmod: p.date }); });
+koPosts.forEach((p) => { write(`posts/${p.slug}/index.html`, buildPost("ko", p, enSlugs.has(p.slug))); urls.push({ loc: `/posts/${p.slug}/`, lastmod: p.date }); });
 
 write("en/index.html", buildHome("en", enPosts)); urls.push({ loc: "/en/", lastmod: latestEn });
 write("en/about/index.html", buildAbout("en")); urls.push({ loc: "/en/about/" });
-enPosts.forEach((p) => { write(`en/posts/${p.slug}/index.html`, buildPost("en", p)); urls.push({ loc: `/en/posts/${p.slug}/`, lastmod: p.date }); });
+enPosts.forEach((p) => { write(`en/posts/${p.slug}/index.html`, buildPost("en", p, koSlugs.has(p.slug))); urls.push({ loc: `/en/posts/${p.slug}/`, lastmod: p.date }); });
 
 write("feed.xml", buildFeed(koPosts));
 write("sitemap.xml", buildSitemap(urls));
@@ -655,6 +663,15 @@ if (ADMIN) {
   // 배포용 빌드에서는 이전에 만들어 둔 관리 페이지를 지웁니다(실수로 공개되는 경로를 아예 없앰)
   fs.rmSync(ADMIN_DIR, { recursive: true, force: true });
 }
+
+/* 한 언어로만 나간 글은 조용히 지나가면 안 됩니다.
+   번역이 빠진 것인지 의도한 것인지는 사람만 알기 때문에 이름을 찍어 둡니다.
+   (짝이 없는 동안 그 글은 hreflang 없이 나갑니다) */
+const solo = [
+  ...koPosts.filter((p) => !enSlugs.has(p.slug)).map((p) => `ko/${p.slug}`),
+  ...enPosts.filter((p) => !koSlugs.has(p.slug)).map((p) => `en/${p.slug}`),
+];
+if (solo.length) console.warn(`  [알림] 짝 언어판이 없어 hreflang 없이 나가는 글: ${solo.join(", ")}\n`);
 
 const draftCount = (koAll.length - koPosts.length) + (enAll.length - enPosts.length);
 console.log(
