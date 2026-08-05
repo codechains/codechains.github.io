@@ -5,7 +5,7 @@ description: Two company websites, two days with Claude and Cursor. How I moved 
 tags: [AI transformation, Claude, Cursor, website migration, Cloudflare, cost]
 ---
 
-In the first post I said I'd change how I work, using AI. So where do you start?
+In [the first post](/en/posts/why-ai-transform/) I said I'd change how I work, using AI. So where do you start?
 
 ## The first thing a small company can actually cash in
 
@@ -137,4 +137,4 @@ The move and the redesign had both been sitting on my list for years. Not becaus
 
 And this isn't a story about one homepage. Every small company has other items shelved for years under "not urgent right now." What I confirmed this week is that there's a reason to pull that list back out.
 
-The next link came from that list: [turning a full day of quoting into five minutes](/en/posts/google-apps-script-quote-automation/).
+The next link comes from that list.

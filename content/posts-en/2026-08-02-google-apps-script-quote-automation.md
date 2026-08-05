@@ -102,6 +102,6 @@ When it was manual, the long part wasn't writing the quote. It was **the time it
 
 Here's what struck me. We already had the tool. We'd been paying for Google Workspace for years, and Apps Script was sitting inside it the whole time. What was missing wasn't the tool. It was **the time to sit down and turn it into code**.
 
-That's exactly the part AI changed. Years of postponement became a few hours. The same thing that happened with the website migration, happening a second time. [When I started this record](/en/posts/why-ai-transform/) I called it the grammar of work changing. This was the second time I watched it happen to my own list.
+That's exactly the part AI changed. Years of postponement became a few hours. The same thing that happened with the website migration, happening a second time.
 
-And yet on the next item, I ended up bringing in a second tool. Why I did that while this automation was running perfectly well is [the story of adding n8n](/en/posts/google-apps-script-to-n8n/).
+And yet on the next item, I ended up [bringing in a second tool](/en/posts/google-apps-script-to-n8n/). Why I did that while this automation was running perfectly well is the next post.
